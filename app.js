@@ -13,7 +13,23 @@ const NON_RIDE_LINE_WEIGHT = 5;
 const RIDE_LINE_WEIGHT = 6;
 const RIDE_COLOR_B1 = '#ffd800';
 const RIDE_COLOR_B2 = '#ff8200';
+const RIDE_COLOR_RAIL = '#0072CE';
 const RIDE_COLOR_DEFAULT = '#ff8200';
+
+// Muted/duller version of a bright hex color, used for the background route
+// lines shown before the person has clicked anything - blends toward a
+// neutral grey and drops saturation/opacity so the active-route colors pop
+// by comparison once a trip is drawn.
+function dullColor(hex, mixWithGrey = 0.55) {
+  const grey = { r: 0x9a, g: 0x97, b: 0x8f }; // matches --muted-ish tone
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  const mix = (c, gc) => Math.round(c + (gc - c) * mixWithGrey);
+  const rr = mix(r, grey.r), gg = mix(g, grey.g), bb = mix(b, grey.b);
+  return `#${[rr, gg, bb].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+}
 const BOARD_ALIGHT_RADIUS = RIDE_LINE_WEIGHT / 2;
 
 // ---------------------------------------------------------------------------
@@ -115,9 +131,14 @@ function renderRouteLines(routesGeojson) {
   const layer = L.geoJSON(routesGeojson, {
     interactive: false, // let clicks pass through to the map
     style: (feature) => {
-      const isB1 = feature.properties.corridor === 'B1';
+      const corridor = feature.properties.corridor;
+      if (corridor === 'RAIL') {
+        const base = feature.properties.color || RIDE_COLOR_RAIL;
+        return { color: dullColor(base), weight: 5, opacity: 0.75 };
+      }
+      const isB1 = corridor === 'B1';
       return {
-        color: isB1 ? '#2f6f4f' : '#c46a2c',
+        color: dullColor(isB1 ? RIDE_COLOR_B1 : RIDE_COLOR_B2),
         weight: isB1 ? 3 : 2.2,
         opacity: isB1 ? 0.75 : 0.55,
       };
@@ -486,9 +507,11 @@ function destPinIcon() {
 }
 
 function routeColor(routeName) {
-  const corridor = graph.routes && graph.routes[routeName] ? graph.routes[routeName].corridor : null;
+  const meta = graph.routes && graph.routes[routeName];
+  const corridor = meta ? meta.corridor : null;
   if (corridor === 'B1') return RIDE_COLOR_B1;
   if (corridor === 'B2') return RIDE_COLOR_B2;
+  if (corridor === 'RAIL') return (meta && meta.color) || RIDE_COLOR_RAIL;
   return RIDE_COLOR_DEFAULT;
 }
 
