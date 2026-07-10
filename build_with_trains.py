@@ -10,6 +10,9 @@ redrawn for rail; the *only* stops trains get are their real GTFS stations
 (location_type=1), projected onto the real GTFS shape for that line.
 """
 
+from shapely.geometry import LineString, MultiLineString, Point
+from shapely.ops import linemerge
+
 import csv
 import json
 import math
@@ -24,6 +27,7 @@ BUS_GEOJSON = f"data/routes.geojson"
 GTFS_ROUTES = f"gtfs/2/google_transit/routes.txt"
 GTFS_SHAPES = f"gtfs/2/google_transit/shapes.txt"
 GTFS_STOPS = f"gtfs/2/google_transit/stops.txt"
+SRL_GEOJSON = f"data/srl.geojson"
 
 OUTPUT_GRAPH = f"data/graph.json"
 OUTPUT_ROUTES_GEOJSON = f"data/routes.geojson"
@@ -31,6 +35,8 @@ OUTPUT_STOPS_DEBUG = f"data/routes_with_stops_debug.geojson"
 
 BUS_SPEED_KMH = 25.0
 TRAIN_SPEED_KMH = 40.0         # express-ish average incl. dwell; only affects ride time, not lines/stops
+SRL_SPEED_KMH = 70.0           # Suburban Rail Loop: modern underground metro, wider stop spacing
+                                # than the legacy network, so a higher average incl. dwell is reasonable
 WALK_SPEED_M_PER_MIN = 80.0
 STOP_SPACING_M = 400.0          # bus resampling only, unchanged from original
 SNAP_TOLERANCE_M = 25.0         # geometric line-crossing cluster tolerance (bus<->bus, bus<->rail)
@@ -40,6 +46,7 @@ INTERCHANGE_PENALTY_MIN = 2.0
 TRAIN_FREQUENCY = 10
 B1_FREQUENCY = 5
 B2_FREQUENCY = 10
+SRL_FREQUENCY = 5
 
 WGS84 = "EPSG:4326"
 METRIC = "EPSG:28355"  # GDA94 / MGA zone 55 - accurate for Melbourne
@@ -59,7 +66,17 @@ def load_bus_routes(path):
         props = f["properties"]
         route_id = props["route"]
         corridor = props["corridor"]
-        line_wgs = LineString(f["geometry"]["coordinates"])
+        geom = f["geometry"]
+        if geom["type"] == "MultiLineString":
+            merged = linemerge(MultiLineString(geom["coordinates"]))
+            if merged.geom_type != "LineString":
+                raise ValueError(
+                    f"Route {route_id} MultiLineString parts don't connect end-to-end "
+                    f"(got {merged.geom_type}) — check the geometry for gaps."
+                )
+            line_wgs = merged
+        else:
+            line_wgs = LineString(geom["coordinates"])
         line_m = shapely_transform(to_metric, line_wgs)
         routes[route_id] = {
             "route_id": route_id,
@@ -187,6 +204,62 @@ def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt):
 
 
 # ---------------------------------------------------------------------------
+# Load the Suburban Rail Loop (SRL) from its own hand-drawn geojson. It has
+# no GTFS data yet, so unlike the legacy rail lines, its real stops are just
+# the line's own vertices (the geometry was digitized stop-to-stop) - the
+# *only* stops SRL gets, no resampling, exactly like real GTFS stations.
+# ---------------------------------------------------------------------------
+
+def load_srl_route(path):
+    data = json.load(open(path))
+    feats = data["features"]
+    if len(feats) != 1:
+        raise ValueError(f"Expected exactly one SRL feature in {path}, found {len(feats)}")
+    f = feats[0]
+    props = f["properties"]
+    geom = f["geometry"]
+
+    if geom["type"] == "MultiLineString":
+        merged = linemerge(MultiLineString(geom["coordinates"]))
+        if merged.geom_type != "LineString":
+            raise ValueError(
+                f"SRL MultiLineString parts don't connect end-to-end "
+                f"(got {merged.geom_type}) — check the geometry for gaps."
+            )
+        line_wgs = merged
+    else:
+        line_wgs = LineString(geom["coordinates"])
+
+    line_m = shapely_transform(to_metric, line_wgs)
+    route_id = "RAIL:SRL"
+
+    route = {
+        "route_id": route_id,
+        "corridor": props.get("corridor", "SRL"),
+        "mode": "rail",
+        "frequency_min": SRL_FREQUENCY,
+        "speed_kmh": SRL_SPEED_KMH,
+        "line_m": line_m,
+        "line_wgs_coords": list(line_wgs.coords),
+        "gtfs_code": "SRL",
+        "short_name": props.get("route", "SRL"),
+    }
+
+    # every vertex of the hand-drawn line is a real stop, in line order
+    real_stops = []
+    for i, (lon, lat) in enumerate(line_wgs.coords):
+        x, y = to_metric(lon, lat)
+        pt = Point(x, y)
+        dist_on_route = line_m.project(pt)
+        stop_id = f"SRL_S{i}"
+        name = f"SRL Station {i + 1}"
+        real_stops.append((dist_on_route, stop_id, x, y, name))
+    real_stops.sort(key=lambda t: t[0])
+
+    return {route_id: route}, {route_id: real_stops}
+
+
+# ---------------------------------------------------------------------------
 # Interchange detection (geometric line crossings) - same approach as
 # preprocess.py, run across bus+rail together so bus<->rail crossings and
 # bus<->bus crossings both still work exactly as before.
@@ -304,6 +377,13 @@ def build_stops(routes, interchanges, real_stops_by_route):
             stops[existing].is_interchange = True
             stops[existing].routes |= ic["routes"]
         else:
+            # No real station already sits here. Rail/SRL stations can't be
+            # moved or invented, so drop any rail routes from this cluster -
+            # only bus routes may get a brand-new node at this crossing.
+            ic["routes"] = {r for r in ic["routes"] if routes[r].get("mode") != "rail"}
+            if not ic["routes"]:
+                ic["stop_id"] = None
+                continue
             sid = f"IC{ic_counter}"
             ic_counter += 1
             ic["stop_id"] = sid
@@ -474,6 +554,11 @@ def main():
     total_stations = len(set(sid for entries in real_stops_by_route.values() for _, sid, *_ in entries))
     print(f"Matched {total_stations} distinct real stations across those lines")
 
+    srl_routes, srl_real_stops = load_srl_route(SRL_GEOJSON)
+    print(f"Loaded {len(srl_routes)} SRL route ({len(next(iter(srl_real_stops.values())))} stops)")
+    train_routes.update(srl_routes)
+    real_stops_by_route.update(srl_real_stops)
+
     routes = {**bus_routes, **train_routes}
 
     interchanges = find_interchanges(routes)
@@ -492,6 +577,7 @@ def main():
         "meta": {
             "bus_speed_kmh": BUS_SPEED_KMH,
             "train_speed_kmh": TRAIN_SPEED_KMH,
+            "srl_speed_kmh": SRL_SPEED_KMH,
             "walk_speed_m_per_min": WALK_SPEED_M_PER_MIN,
             "interchange_penalty_min": INTERCHANGE_PENALTY_MIN,
             "stop_spacing_m": STOP_SPACING_M,

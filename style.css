@@ -6,6 +6,7 @@
   --b1: #ffd800;
   --b2: #ff8200;
   --rail: #0072CE;
+  --srl: #008746;
   --accent: #1d4ed8;
   --origin: #2f6f4f;
   --dest: #b3392c;
@@ -87,6 +88,7 @@ html, body {
 .swatch.b1 { background: var(--b1); }
 .swatch.b2 { background: var(--b2); }
 .swatch.rail { background: var(--rail); }
+.swatch.srl { background: var(--srl); }
 
 #layout {
   flex: 1;

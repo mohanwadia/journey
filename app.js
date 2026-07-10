@@ -15,6 +15,7 @@ const RIDE_COLOR_B1 = '#ffd800';
 const RIDE_COLOR_B2 = '#ff8200';
 const RIDE_COLOR_RAIL = '#0072CE';
 const RIDE_COLOR_DEFAULT = '#ff8200';
+const RIDE_COLOR_SRL = '#008746';
 
 // Muted/duller version of a bright hex color, used for the background route
 // lines shown before the person has clicked anything - blends toward a
@@ -134,6 +135,10 @@ function renderRouteLines(routesGeojson) {
       const corridor = feature.properties.corridor;
       if (corridor === 'RAIL') {
         const base = feature.properties.color || RIDE_COLOR_RAIL;
+        return { color: dullColor(base), weight: 5, opacity: 0.75 };
+      }
+      if (corridor === 'SRL') {
+        const base = feature.properties.color || RIDE_COLOR_SRL;
         return { color: dullColor(base), weight: 5, opacity: 0.75 };
       }
       const isB1 = corridor === 'B1';
@@ -512,6 +517,7 @@ function routeColor(routeName) {
   if (corridor === 'B1') return RIDE_COLOR_B1;
   if (corridor === 'B2') return RIDE_COLOR_B2;
   if (corridor === 'RAIL') return (meta && meta.color) || RIDE_COLOR_RAIL;
+  if (corridor === 'SRL') return (meta && meta.color) || RIDE_COLOR_SRL;
   return RIDE_COLOR_DEFAULT;
 }
 
