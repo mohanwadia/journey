@@ -25,6 +25,12 @@ let pathLayer = null;
 
 const map = L.map('map', { zoomControl: true });
 
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 20,
+}).addTo(map);
+
 // ---------------------------------------------------------------------------
 // Load data
 // ---------------------------------------------------------------------------
@@ -38,6 +44,7 @@ Promise.all([
   buildStopIndex();
   renderRouteLines(routesGeojson);
   map.on('click', onMapClick);
+  loadFromPermalink();
 }).catch(err => {
   document.getElementById('instruction-text').textContent =
     'Could not load network data — check the console. If you opened this file directly, ' +
@@ -326,6 +333,65 @@ function renderPathOnMap(result) {
 // Interaction
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Permalinks (?origin=lat,lng&dest=lat,lng)
+// ---------------------------------------------------------------------------
+
+function parseLatLngParam(str) {
+  if (!str) return null;
+  const parts = str.split(',').map(Number);
+  if (parts.length !== 2 || parts.some(Number.isNaN)) return null;
+  return { lat: parts[0], lng: parts[1] };
+}
+
+function loadFromPermalink() {
+  const params = new URLSearchParams(window.location.search);
+  const o = parseLatLngParam(params.get('origin'));
+  const d = parseLatLngParam(params.get('dest'));
+  if (!o || !d) return;
+
+  originLatLng = L.latLng(o.lat, o.lng);
+  destLatLng = L.latLng(d.lat, d.lng);
+  originMarker = L.circleMarker(originLatLng, { radius: 7, color: '#2f6f4f', fillColor: '#2f6f4f', fillOpacity: 1 }).addTo(map);
+  destMarker = L.circleMarker(destLatLng, { radius: 7, color: '#b3392c', fillColor: '#b3392c', fillOpacity: 1 }).addTo(map);
+  map.fitBounds(L.latLngBounds([originLatLng, destLatLng]), { padding: [80, 80] });
+
+  const result = findRoute(originLatLng, destLatLng);
+  if (!result) {
+    document.getElementById('instruction-text').textContent =
+      'No route found between the linked points — try clicking closer to the network.';
+    return;
+  }
+  renderItinerary(result);
+  renderPathOnMap(result);
+  updatePermalink();
+  document.getElementById('instruction-text').innerHTML = 'Click <strong>Reset</strong> to plan another trip.';
+}
+
+function updatePermalink() {
+  if (!originLatLng || !destLatLng) return;
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.searchParams.set('origin', `${originLatLng.lat.toFixed(6)},${originLatLng.lng.toFixed(6)}`);
+  url.searchParams.set('dest', `${destLatLng.lat.toFixed(6)},${destLatLng.lng.toFixed(6)}`);
+  window.history.replaceState({}, '', url);
+
+  const shareBtn = document.getElementById('share-btn');
+  if (shareBtn) shareBtn.classList.remove('hidden');
+}
+
+function copyShareLink() {
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    const shareBtn = document.getElementById('share-btn');
+    if (!shareBtn) return;
+    const original = shareBtn.textContent;
+    shareBtn.textContent = 'Link copied!';
+    setTimeout(() => { shareBtn.textContent = original; }, 1500);
+  }).catch(() => {
+    window.prompt('Copy this link:', window.location.href);
+  });
+}
+
 function onMapClick(e) {
   if (!graph) return;
 
@@ -337,22 +403,23 @@ function onMapClick(e) {
     return;
   }
 
-  if (!destLatLng) {
-    destLatLng = e.latlng;
-    if (destMarker) map.removeLayer(destMarker);
-    destMarker = L.circleMarker(e.latlng, { radius: 7, color: '#b3392c', fillColor: '#b3392c', fillOpacity: 1 }).addTo(map);
+  // Origin is already set (whether this is the 2nd click or a later one) —
+  // every subsequent click just moves the destination and re-routes,
+  // instead of getting ignored once both points exist.
+  destLatLng = e.latlng;
+  if (destMarker) map.removeLayer(destMarker);
+  destMarker = L.circleMarker(e.latlng, { radius: 7, color: '#b3392c', fillColor: '#b3392c', fillOpacity: 1 }).addTo(map);
 
-    const result = findRoute(originLatLng, destLatLng);
-    if (!result) {
-      document.getElementById('instruction-text').textContent =
-        'No route found between those points — try clicking closer to the network.';
-      return;
-    }
-    renderItinerary(result);
-    renderPathOnMap(result);
-    document.getElementById('instruction-text').innerHTML = 'Click <strong>Reset</strong> to plan another trip.';
+  const result = findRoute(originLatLng, destLatLng);
+  if (!result) {
+    document.getElementById('instruction-text').textContent =
+      'No route found between those points — try clicking closer to the network.';
     return;
   }
+  renderItinerary(result);
+  renderPathOnMap(result);
+  updatePermalink();
+  document.getElementById('instruction-text').innerHTML = 'Click to move your <strong>destination</strong>, or Reset to change your origin.';
 }
 
 document.getElementById('reset-btn').addEventListener('click', () => {
@@ -366,4 +433,12 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   document.getElementById('itinerary').classList.add('hidden');
   document.getElementById('empty-state').classList.remove('hidden');
   document.getElementById('instruction-text').innerHTML = 'Click the map to set your <strong>origin</strong>.';
+
+  const shareBtn = document.getElementById('share-btn');
+  if (shareBtn) shareBtn.classList.add('hidden');
+  const url = new URL(window.location.href);
+  url.search = '';
+  window.history.replaceState({}, '', url);
 });
+
+document.getElementById('share-btn').addEventListener('click', copyShareLink);

@@ -118,6 +118,11 @@ html, body {
   line-height: 1.5;
 }
 
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
 .btn-secondary {
   font-family: var(--mono);
   font-size: 12px;
