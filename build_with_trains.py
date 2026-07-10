@@ -20,25 +20,26 @@ from pyproj import Transformer
 from shapely.geometry import LineString, Point
 from shapely.ops import transform as shapely_transform
 
-WORK = "/home/claude/work"
-BUS_GEOJSON = f"{WORK}/routes.geojson"
-GTFS_ROUTES = f"{WORK}/routes.txt"
-GTFS_SHAPES = f"{WORK}/shapes.txt"
-GTFS_STOPS = f"{WORK}/stops.txt"
+BUS_GEOJSON = f"data/routes.geojson"
+GTFS_ROUTES = f"gtfs/2/google_transit/routes.txt"
+GTFS_SHAPES = f"gtfs/2/google_transit/shapes.txt"
+GTFS_STOPS = f"gtfs/2/google_transit/stops.txt"
 
-OUTPUT_GRAPH = f"{WORK}/data/graph.json"
-OUTPUT_ROUTES_GEOJSON = f"{WORK}/data/routes.geojson"
-OUTPUT_STOPS_DEBUG = f"{WORK}/routes_with_stops_debug.geojson"
+OUTPUT_GRAPH = f"data/graph.json"
+OUTPUT_ROUTES_GEOJSON = f"data/routes.geojson"
+OUTPUT_STOPS_DEBUG = f"data/routes_with_stops_debug.geojson"
 
-UNIFORM_FREQUENCY_MIN = 10.0   # <-- the ask: every route, bus or train, 10 min
 BUS_SPEED_KMH = 25.0
-TRAIN_SPEED_KMH = 60.0         # express-ish average incl. dwell; only affects ride time, not lines/stops
+TRAIN_SPEED_KMH = 40.0         # express-ish average incl. dwell; only affects ride time, not lines/stops
 WALK_SPEED_M_PER_MIN = 80.0
 STOP_SPACING_M = 400.0          # bus resampling only, unchanged from original
 SNAP_TOLERANCE_M = 25.0         # geometric line-crossing cluster tolerance (bus<->bus, bus<->rail)
 STATION_SNAP_TOLERANCE_M = 80.0 # how close a real GTFS station must be to a rail shape to "belong" to it
 MIN_STOP_SEPARATION_M = 150.0
 INTERCHANGE_PENALTY_MIN = 2.0
+TRAIN_FREQUENCY = 10
+B1_FREQUENCY = 5
+B2_FREQUENCY = 10
 
 WGS84 = "EPSG:4326"
 METRIC = "EPSG:28355"  # GDA94 / MGA zone 55 - accurate for Melbourne
@@ -64,7 +65,7 @@ def load_bus_routes(path):
             "route_id": route_id,
             "corridor": corridor,
             "mode": "bus",
-            "frequency_min": UNIFORM_FREQUENCY_MIN,
+            "frequency_min": B1_FREQUENCY if corridor == 'B1' else B2_FREQUENCY,
             "speed_kmh": BUS_SPEED_KMH,
             "line_m": line_m,
             "line_wgs_coords": list(line_wgs.coords),
@@ -155,7 +156,7 @@ def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt):
             "route_id": route_id,
             "corridor": "RAIL",
             "mode": "rail",
-            "frequency_min": UNIFORM_FREQUENCY_MIN,
+            "frequency_min": TRAIN_FREQUENCY,
             "speed_kmh": TRAIN_SPEED_KMH,
             "line_m": line_m,
             "line_wgs_coords": list(line_wgs.coords),
@@ -463,7 +464,7 @@ def export_debug_geojson(stops, path):
 
 def main():
     import os
-    os.makedirs(f"{WORK}/data", exist_ok=True)
+    os.makedirs(f"data", exist_ok=True)
 
     bus_routes = load_bus_routes(BUS_GEOJSON)
     print(f"Loaded {len(bus_routes)} bus routes (lines unchanged)")
@@ -494,7 +495,9 @@ def main():
             "walk_speed_m_per_min": WALK_SPEED_M_PER_MIN,
             "interchange_penalty_min": INTERCHANGE_PENALTY_MIN,
             "stop_spacing_m": STOP_SPACING_M,
-            "uniform_frequency_min": UNIFORM_FREQUENCY_MIN,
+            "train_frequency": TRAIN_FREQUENCY,
+            "B1_frequency": B1_FREQUENCY,
+            "B2_frequency": B2_FREQUENCY
         },
         "routes": {rid: {"frequency_min": r["frequency_min"], "corridor": r["corridor"], "mode": r["mode"]}
                    for rid, r in routes.items()},
