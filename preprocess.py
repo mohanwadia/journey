@@ -110,7 +110,7 @@ def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt):
             code = gtfs_route_code(row["route_id"])
             train_routes[code] = {
                 "route_id": row["route_id"],
-                "short_name": row["route_short_name"] or row["route_long_name"],
+                "short_name": row["route_long_name"] or row["route_long_name"],
             }
 
     # 2. group shape points by shape_id
