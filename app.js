@@ -133,6 +133,20 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+function nodeCoord(id) {
+  if (id === 'USER_ORIGIN') return originLatLng ? { lat: originLatLng.lat, lon: originLatLng.lng } : null;
+  if (id === 'USER_DESTINATION') return destLatLng ? { lat: destLatLng.lat, lon: destLatLng.lng } : null;
+  const n = graph.nodes[id];
+  return n ? { lat: n.lat, lon: n.lon } : null;
+}
+
+function edgeDistanceM(e) {
+  const a = nodeCoord(e.from);
+  const b = nodeCoord(e.to);
+  if (!a || !b) return 0;
+  return haversineMeters(a.lat, a.lon, b.lat, b.lon);
+}
+
 function nearestStops(lat, lon, candidates, k, maxM) {
   const scored = candidates
     .map((c) => ({ ...c, dist: haversineMeters(lat, lon, c.lat, c.lon) }))
@@ -265,6 +279,7 @@ function buildItinerary(edges) {
   const legs = [];
   let i = 0;
   let walkTotal = 0, waitTotal = 0, rideTotal = 0;
+  let distTotal = 0;
 
   while (i < edges.length) {
     const e = edges[i];
@@ -275,40 +290,45 @@ function buildItinerary(edges) {
 
     if (e.type === 'walk') {
       walkTotal += e.weight_min;
-      const destStopId = graph.nodes[e.to]?.stop_id;
-      const label = e.to.startsWith('USER')
-        ? 'Walk to your destination'
-        : `Walk to ${stopLabel(destStopId)}`;
-      legs.push({ type: 'walk', label, min: e.weight_min });
+      const distM = edgeDistanceM(e);
+      distTotal += distM;
+      legs.push({ type: 'walk', label: 'Walk', min: e.weight_min, distM });
       i++; continue;
     }
 
     if (e.type === 'board') {
       waitTotal += e.weight_min;
-      const boardStopId = graph.nodes[e.from]?.stop_id;
-      const stopPart = stopNames.get(boardStopId) ? ` at ${stopNames.get(boardStopId)}` : '';
-      legs.push({ type: 'board', label: `Board Route ${e.route}${stopPart} (avg wait ${round1(e.weight_min)} min)`, min: e.weight_min });
+      legs.push({ type: 'board', label: 'Wait', min: e.weight_min });
       i++; continue;
     }
 
     if (e.type === 'transfer') {
       waitTotal += e.weight_min;
-      const transferStopId = graph.nodes[e.from]?.stop_id;
-      const stopPart = stopNames.get(transferStopId) ? ` at ${stopNames.get(transferStopId)}` : '';
-      legs.push({ type: 'transfer', label: `Transfer to Route ${e.route}${stopPart} (wait + interchange, ${round1(e.weight_min)} min)`, min: e.weight_min });
+      legs.push({ type: 'transfer', label: 'Transfer', min: e.weight_min });
       i++; continue;
     }
 
     if (e.type === 'ride') {
       let sum = e.weight_min;
+      let distM = edgeDistanceM(e);
       const route = e.route;
+      let stopCount = 1; // this edge covers one stop-to-stop hop
       let j = i + 1;
       while (j < edges.length && edges[j].type === 'ride' && edges[j].route === route) {
         sum += edges[j].weight_min;
+        distM += edgeDistanceM(edges[j]);
+        stopCount++;
         j++;
       }
       rideTotal += sum;
-      legs.push({ type: 'ride', label: `Ride Route ${route}`, min: sum });
+      distTotal += distM;
+      legs.push({
+        type: 'ride',
+        label: route,
+        min: sum,
+        stopCount,
+        distM,
+      });
       i = j; continue;
     }
 
@@ -316,33 +336,130 @@ function buildItinerary(edges) {
     i++;
   }
 
-  return { legs, walkTotal, waitTotal, rideTotal };
+  return { legs, walkTotal, waitTotal, rideTotal, distTotal };
 }
 
 function round1(x) { return Math.round(x * 10) / 10; }
+
+const WALK_ICON_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="13.5" cy="4" r="2"/>
+  <path d="M14.7 8.1c-.4-.2-.9-.1-1.2.2l-2.1 2.3-2.8-.9c-.5-.1-1 .1-1.2.6l-1.8 4c-.2.5 0 1.1.5 1.3.5.2 1.1 0 1.3-.5l1.4-3.1 1.7.5-2.7 8.8c-.2.5.1 1.1.6 1.3.5.2 1.1-.1 1.3-.6l1.8-5.9 1.5 1.4-.9 4.3c-.1.5.2 1.1.8 1.2.5.1 1.1-.2 1.2-.8l1-4.9c.1-.4-.1-.8-.4-1.1l-2-1.8.9-3.5 1 1.6c.1.2.3.4.5.5l2.4 1.1c.5.2 1.1 0 1.3-.5.2-.5 0-1.1-.5-1.3l-2.2-1-1.9-3.3c-.1-.2-.3-.4-.5-.5z"/>
+</svg>`;
+
+// Merges the raw per-edge legs into itinerary display groups:
+// - ride legs stay standalone (route name + stop/time detail)
+// - a walk immediately followed by a wait (boarding) becomes one combined
+//   "Walk / Wait" item with a walking-person icon
+// - a transfer becomes a combined "Walk / Transfer" item, with the walk
+//   portion fixed at 2 min (the interchange penalty already baked into
+//   the transfer edge's weight)
+function groupLegsForDisplay(legs) {
+  const groups = [];
+  let i = 0;
+  while (i < legs.length) {
+    const leg = legs[i];
+
+    if (leg.type === 'ride') {
+      groups.push({ kind: 'ride', leg });
+      i++; continue;
+    }
+
+    if (leg.type === 'walk' && legs[i + 1] && legs[i + 1].type === 'board') {
+      groups.push({
+        kind: 'walk-combo',
+        mainLabel: 'Walk', mainMin: leg.min,
+        subLabel: 'Wait', subMin: legs[i + 1].min,
+      });
+      i += 2; continue;
+    }
+
+    if (leg.type === 'transfer') {
+      groups.push({
+        kind: 'walk-combo',
+        mainLabel: 'Walk', mainMin: 2,
+        subLabel: 'Transfer', subMin: leg.min,
+      });
+      i++; continue;
+    }
+
+    if (leg.type === 'walk') {
+      groups.push({ kind: 'walk-combo', mainLabel: 'Walk', mainMin: leg.min, subLabel: null, subMin: null });
+      i++; continue;
+    }
+
+    if (leg.type === 'board') {
+      groups.push({ kind: 'walk-combo', mainLabel: 'Wait', mainMin: leg.min, subLabel: null, subMin: null });
+      i++; continue;
+    }
+
+    i++;
+  }
+  return groups;
+}
 
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 
 function renderItinerary(result) {
-  const { legs, walkTotal, waitTotal, rideTotal } = buildItinerary(result.edges);
+  const { legs } = buildItinerary(result.edges);
 
   document.getElementById('empty-state').classList.add('hidden');
   document.getElementById('summary').classList.remove('hidden');
   document.getElementById('itinerary').classList.remove('hidden');
 
   document.getElementById('total-time').textContent = Math.round(result.totalMin);
-  document.getElementById('bd-walk').textContent = round1(walkTotal);
-  document.getElementById('bd-wait').textContent = round1(waitTotal);
-  document.getElementById('bd-ride').textContent = round1(rideTotal);
+
+  // Horizontal bar: one segment per leg, width proportional to its share of total time.
+  const timeBar = document.getElementById('time-bar');
+  if (timeBar) {
+    timeBar.innerHTML = '';
+    const totalMin = legs.reduce((sum, leg) => sum + leg.min, 0) || 1;
+    for (const leg of legs) {
+      const seg = document.createElement('div');
+      seg.className = `time-bar-seg ${leg.type === 'ride' ? 'is-ride' : 'is-other'}`;
+      seg.style.width = `${(leg.min / totalMin) * 100}%`;
+      seg.title = `${leg.label} — ${Math.round(leg.min)} min`;
+      timeBar.appendChild(seg);
+    }
+  }
 
   const list = document.getElementById('itinerary-list');
   list.innerHTML = '';
-  for (const leg of legs) {
+  const groups = groupLegsForDisplay(legs);
+  for (const group of groups) {
     const li = document.createElement('li');
-    li.className = `type-${leg.type}`;
-    li.innerHTML = `<span class="leg-label">${leg.label}</span><br/><span class="leg-time">${round1(leg.min)} min</span>`;
+    li.className = group.kind === 'ride' ? 'type-ride' : 'type-other';
+
+    const marker = document.createElement('div');
+    marker.className = 'leg-marker';
+    if (group.kind === 'ride') {
+      const markerShape = document.createElement('div');
+      markerShape.className = 'marker-bar';
+      marker.appendChild(markerShape);
+    } else {
+      const iconWrap = document.createElement('div');
+      iconWrap.className = 'marker-icon';
+      iconWrap.innerHTML = WALK_ICON_SVG;
+      marker.appendChild(iconWrap);
+    }
+
+    const content = document.createElement('div');
+    content.className = 'leg-content';
+
+    if (group.kind === 'ride') {
+      const leg = group.leg;
+      const stopLabelText = leg.stopCount === 1 ? '1 stop' : `${leg.stopCount} stops`;
+      content.innerHTML =
+        `<span class="leg-route-name">${leg.label}</span>` +
+        `<span class="leg-sub">${Math.round(leg.min)} min, ${stopLabelText}</span>`;
+    } else {
+      content.innerHTML = `<span class="leg-main">${group.mainLabel} ${Math.round(group.mainMin)} min</span>` +
+        (group.subLabel ? `<span class="leg-sub">${group.subLabel} ${Math.round(group.subMin)} min</span>` : '');
+    }
+
+    li.appendChild(marker);
+    li.appendChild(content);
     list.appendChild(li);
   }
 }

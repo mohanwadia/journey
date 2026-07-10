@@ -41,11 +41,7 @@
           <span id="total-time">—</span>
           <span class="summary-unit">min</span>
         </div>
-        <div class="summary-breakdown">
-          <span><i class="dot walk"></i> <span id="bd-walk">0</span> min walk</span>
-          <span><i class="dot wait"></i> <span id="bd-wait">0</span> min wait</span>
-          <span><i class="dot ride"></i> <span id="bd-ride">0</span> min ride</span>
-        </div>
+        <div id="time-bar" class="time-bar"></div>
       </div>
 
       <div id="itinerary" class="panel-block hidden">
@@ -53,10 +49,7 @@
         <ol id="itinerary-list"></ol>
       </div>
 
-      <div id="empty-state" class="panel-block">
-        <p>No route calculated yet.</p>
-        <p class="hint">Walking speed is fixed at 80 m/min. Wait time is half the route's frequency. Transfers add a 2 min interchange penalty.</p>
-      </div>
+      <div id="empty-state" class="panel-block"></div>
     </aside>
   </main>
 </div>
