@@ -7,6 +7,15 @@ const WALK_SPEED_M_PER_MIN = 80;      // must match preprocess.py's constant
 const MAX_WALK_TO_STOP_M = 900;       // how far we'll look for a boarding/alighting stop
 const NEAREST_STOP_CANDIDATES = 4;    // don't just take the closest stop — give the router options
 
+// Map styling
+const NON_RIDE_LINE_COLOR = '#333434';
+const NON_RIDE_LINE_WEIGHT = 5;
+const RIDE_LINE_WEIGHT = 6;
+const RIDE_COLOR_B1 = '#ffd800';
+const RIDE_COLOR_B2 = '#ff8200';
+const RIDE_COLOR_DEFAULT = '#ff8200';
+const BOARD_ALIGHT_RADIUS = RIDE_LINE_WEIGHT / 2;
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -464,21 +473,99 @@ function renderItinerary(result) {
   }
 }
 
+function destPinIcon() {
+  return L.divIcon({
+    className: 'dest-pin-icon',
+    html: `<svg width="26" height="34" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg">
+      <path d="M13 0C5.8 0 0 5.8 0 13c0 9.3 13 21 13 21s13-11.7 13-21C26 5.8 20.2 0 13 0z" fill="#b3392c" stroke="#1a1d1f" stroke-width="1.2"/>
+      <circle cx="13" cy="13" r="4.5" fill="#ffffff"/>
+    </svg>`,
+    iconSize: [26, 34],
+    iconAnchor: [13, 34],
+  });
+}
+
+function routeColor(routeName) {
+  const corridor = graph.routes && graph.routes[routeName] ? graph.routes[routeName].corridor : null;
+  if (corridor === 'B1') return RIDE_COLOR_B1;
+  if (corridor === 'B2') return RIDE_COLOR_B2;
+  return RIDE_COLOR_DEFAULT;
+}
+
+function edgeCoord(id) {
+  if (id === 'USER_ORIGIN') return [originLatLng.lat, originLatLng.lng];
+  if (id === 'USER_DESTINATION') return [destLatLng.lat, destLatLng.lng];
+  const n = graph.nodes[id];
+  return n ? [n.lat, n.lon] : null;
+}
+
 function renderPathOnMap(result) {
   if (pathLayer) map.removeLayer(pathLayer);
-  const latlngs = [];
-  const pushNode = (id) => {
-    const n = graph.nodes[id];
-    if (n) latlngs.push([n.lat, n.lon]);
-  };
-  latlngs.push([originLatLng.lat, originLatLng.lng]);
-  for (const e of result.edges) {
-    if (e.to === 'USER_DESTINATION') continue;
-    pushNode(e.to);
-  }
-  latlngs.push([destLatLng.lat, destLatLng.lng]);
+  pathLayer = L.layerGroup().addTo(map);
 
-  pathLayer = L.polyline(latlngs, { color: '#1d4ed8', weight: 4, opacity: 0.85 }).addTo(map);
+  const boardAlightPoints = [];
+  let currentSegment = null; // { kind: 'ride'|'other', route, points: [[lat,lon], ...] }
+  let prevCoord = [originLatLng.lat, originLatLng.lng];
+
+  const flushSegment = () => {
+    if (!currentSegment || currentSegment.points.length < 2) { currentSegment = null; return; }
+    if (currentSegment.kind === 'ride') {
+      L.polyline(currentSegment.points, {
+        color: routeColor(currentSegment.route),
+        weight: RIDE_LINE_WEIGHT,
+        opacity: 1,
+      }).addTo(pathLayer);
+    } else {
+      L.polyline(currentSegment.points, {
+        color: NON_RIDE_LINE_COLOR,
+        weight: NON_RIDE_LINE_WEIGHT,
+        opacity: 0.9,
+        dashArray: '2, 10',
+        lineCap: 'round',
+      }).addTo(pathLayer);
+    }
+    currentSegment = null;
+  };
+
+  for (const e of result.edges) {
+    const toCoord = edgeCoord(e.to);
+    if (!toCoord) continue;
+
+    if (e.type === 'ride') {
+      if (!currentSegment || currentSegment.kind !== 'ride' || currentSegment.route !== e.route) {
+        flushSegment();
+        boardAlightPoints.push(prevCoord); // getting on this route
+        currentSegment = { kind: 'ride', route: e.route, points: [prevCoord] };
+      }
+      currentSegment.points.push(toCoord);
+    } else if (e.type === 'walk') {
+      if (!currentSegment || currentSegment.kind !== 'other') {
+        flushSegment();
+        currentSegment = { kind: 'other', points: [prevCoord] };
+      }
+      currentSegment.points.push(toCoord);
+    } else {
+      // board / transfer / alight: no physical movement (same stop) — these
+      // mark a transition, so close off a ride segment if one was open.
+      if (currentSegment && currentSegment.kind === 'ride') {
+        boardAlightPoints.push(prevCoord); // getting off this route
+        flushSegment();
+      }
+    }
+
+    prevCoord = toCoord;
+  }
+  flushSegment();
+
+  for (const pt of boardAlightPoints) {
+    L.circleMarker(pt, {
+      radius: BOARD_ALIGHT_RADIUS,
+      color: '#1a1d1f',
+      weight: 2,
+      fillColor: '#ffffff',
+      fillOpacity: 1,
+    }).addTo(pathLayer);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -504,8 +591,8 @@ function loadFromPermalink() {
 
   originLatLng = L.latLng(o.lat, o.lng);
   destLatLng = L.latLng(d.lat, d.lng);
-  originMarker = L.circleMarker(originLatLng, { radius: 7, color: '#2f6f4f', fillColor: '#2f6f4f', fillOpacity: 1 }).addTo(map);
-  destMarker = L.circleMarker(destLatLng, { radius: 7, color: '#b3392c', fillColor: '#b3392c', fillOpacity: 1 }).addTo(map);
+  originMarker = L.circleMarker(originLatLng, { radius: 7, color: '#1a1d1f', weight: 2, fillColor: '#1a1d1f', fillOpacity: 1 }).addTo(map);
+  destMarker = L.marker(destLatLng, { icon: destPinIcon() }).addTo(map);
   map.fitBounds(L.latLngBounds([originLatLng, destLatLng]), { padding: [80, 80] });
 
   const result = findRoute(originLatLng, destLatLng);
@@ -550,7 +637,7 @@ function onMapClick(e) {
   if (!originLatLng) {
     originLatLng = e.latlng;
     if (originMarker) map.removeLayer(originMarker);
-    originMarker = L.circleMarker(e.latlng, { radius: 7, color: '#2f6f4f', fillColor: '#2f6f4f', fillOpacity: 1 }).addTo(map);
+    originMarker = L.circleMarker(e.latlng, { radius: 7, color: '#1a1d1f', weight: 2, fillColor: '#1a1d1f', fillOpacity: 1 }).addTo(map);
     document.getElementById('instruction-text').innerHTML = 'Now click to set your <strong>destination</strong>.';
     return;
   }
@@ -560,7 +647,7 @@ function onMapClick(e) {
   // instead of getting ignored once both points exist.
   destLatLng = e.latlng;
   if (destMarker) map.removeLayer(destMarker);
-  destMarker = L.circleMarker(e.latlng, { radius: 7, color: '#b3392c', fillColor: '#b3392c', fillOpacity: 1 }).addTo(map);
+  destMarker = L.marker(e.latlng, { icon: destPinIcon() }).addTo(map);
 
   const result = findRoute(originLatLng, destLatLng);
   if (!result) {
