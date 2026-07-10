@@ -35,7 +35,7 @@ OUTPUT_STOPS_DEBUG = f"data/routes_with_stops_debug.geojson"
 
 BUS_SPEED_KMH = 25.0
 TRAIN_SPEED_KMH = 40.0         # express-ish average incl. dwell; only affects ride time, not lines/stops
-SRL_SPEED_KMH = 60.0           # Suburban Rail Loop: modern underground metro, wider stop spacing
+SRL_SPEED_KMH = 62.0           # Suburban Rail Loop: modern underground metro, wider stop spacing
                                 # than the legacy network, so a higher average incl. dwell is reasonable
 WALK_SPEED_M_PER_MIN = 80.0
 STOP_SPACING_M = 400.0          # bus resampling only, unchanged from original

@@ -11,7 +11,7 @@ const NEAREST_STOP_CANDIDATES = 4;    // don't just take the closest stop — gi
 const NON_RIDE_LINE_COLOR = '#333434';
 const NON_RIDE_LINE_WEIGHT = 5;
 const RIDE_LINE_WEIGHT = 6;
-const RIDE_COLOR_B1 = '#ffd800';
+const RIDE_COLOR_B1 = '#DA291C';
 const RIDE_COLOR_B2 = '#ff8200';
 const RIDE_COLOR_RAIL = '#0072CE';
 const RIDE_COLOR_DEFAULT = '#ff8200';
@@ -360,6 +360,7 @@ function buildItinerary(edges) {
       legs.push({
         type: 'ride',
         label: route,
+        route,
         min: sum,
         stopCount,
         distM,
@@ -454,6 +455,12 @@ function renderItinerary(result) {
       const seg = document.createElement('div');
       seg.className = `time-bar-seg ${leg.type === 'ride' ? 'is-ride' : 'is-other'}`;
       seg.style.width = `${(leg.min / totalMin) * 100}%`;
+      if (leg.type === 'ride') {
+        const mode = graph.routes && graph.routes[leg.route] && graph.routes[leg.route].mode;
+        if (mode === 'rail') {
+          seg.style.background = routeColor(leg.route);
+        }
+      }
       seg.title = `${leg.label} — ${Math.round(leg.min)} min`;
       timeBar.appendChild(seg);
     }
@@ -471,6 +478,10 @@ function renderItinerary(result) {
     if (group.kind === 'ride') {
       const markerShape = document.createElement('div');
       markerShape.className = 'marker-bar';
+      const mode = graph.routes && graph.routes[group.leg.route] && graph.routes[group.leg.route].mode;
+      if (mode === 'rail') {
+        markerShape.style.background = routeColor(group.leg.route);
+      }
       marker.appendChild(markerShape);
     } else {
       const iconWrap = document.createElement('div');
@@ -516,8 +527,12 @@ function routeColor(routeName) {
   const corridor = meta ? meta.corridor : null;
   if (corridor === 'B1') return RIDE_COLOR_B1;
   if (corridor === 'B2') return RIDE_COLOR_B2;
-  if (corridor === 'RAIL') return (meta && meta.color) || RIDE_COLOR_RAIL;
-  if (corridor === 'SRL') return (meta && meta.color) || RIDE_COLOR_SRL;
+  if (meta && meta.mode === 'rail') {
+    if (routeName === 'RAIL:SRL' || corridor === 'SRL') {
+      return (meta && meta.color) || RIDE_COLOR_SRL;
+    }
+    return (meta && meta.color) || RIDE_COLOR_RAIL;
+  }
   return RIDE_COLOR_DEFAULT;
 }
 
