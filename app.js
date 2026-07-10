@@ -16,6 +16,8 @@ let baseAdj = new Map();        // nodeId -> [edge, ...]
 let hubInNodes = [];            // [{id, lat, lon}, ...]
 let hubOutNodes = [];
 let stopRoutes = new Map();     // stop_id -> Set(route_id)  (for itinerary labels)
+let stopNames = new Map();      // stop_id -> "Cross St / Main Rd"  (optional, from geocode_stop_names.py)
+let stopMarkersLayer = null;    // small dots showing named stops, visible when zoomed in
 
 let originLatLng = null;
 let destLatLng = null;
@@ -38,11 +40,14 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
 Promise.all([
   fetch('data/graph.json').then(r => r.json()),
   fetch('data/routes.geojson').then(r => r.json()),
-]).then(([graphData, routesGeojson]) => {
+  fetch('data/stop_names.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
+]).then(([graphData, routesGeojson, stopNamesData]) => {
   graph = graphData;
+  stopNames = new Map(Object.entries(stopNamesData));
   buildAdjacency();
   buildStopIndex();
   renderRouteLines(routesGeojson);
+  renderStopMarkers();
   map.on('click', onMapClick);
   loadFromPermalink();
 }).catch(err => {
@@ -71,6 +76,30 @@ function buildStopIndex() {
       stopRoutes.get(n.stop_id).add(n.route);
     }
   }
+}
+
+function renderStopMarkers() {
+  stopMarkersLayer = L.layerGroup();
+  for (const [stopId, name] of stopNames.entries()) {
+    // any hub_in node for this stop gives us its coordinates
+    const node = Object.values(graph.nodes).find(n => n.stop_id === stopId && n.type === 'hub_in');
+    if (!node) continue;
+    const marker = L.circleMarker([node.lat, node.lon], {
+      radius: 3, weight: 1, color: '#1a1d1f', fillColor: '#f7f6f3', fillOpacity: 1,
+    }).bindPopup(name);
+    stopMarkersLayer.addLayer(marker);
+  }
+
+  const STOP_MARKER_MIN_ZOOM = 15;
+  const updateVisibility = () => {
+    if (map.getZoom() >= STOP_MARKER_MIN_ZOOM) {
+      if (!map.hasLayer(stopMarkersLayer)) stopMarkersLayer.addTo(map);
+    } else {
+      if (map.hasLayer(stopMarkersLayer)) map.removeLayer(stopMarkersLayer);
+    }
+  };
+  map.on('zoomend', updateVisibility);
+  updateVisibility();
 }
 
 function renderRouteLines(routesGeojson) {
@@ -224,6 +253,8 @@ function findRoute(origin, dest) {
 // ---------------------------------------------------------------------------
 
 function stopLabel(stopId) {
+  const realName = stopNames.get(stopId);
+  if (realName) return realName;
   const routes = stopRoutes.get(stopId);
   if (!routes || routes.size === 0) return 'this stop';
   if (routes.size === 1) return `the Route ${[...routes][0]} stop`;
@@ -254,13 +285,17 @@ function buildItinerary(edges) {
 
     if (e.type === 'board') {
       waitTotal += e.weight_min;
-      legs.push({ type: 'board', label: `Board Route ${e.route} (avg wait ${round1(e.weight_min)} min)`, min: e.weight_min });
+      const boardStopId = graph.nodes[e.from]?.stop_id;
+      const stopPart = stopNames.get(boardStopId) ? ` at ${stopNames.get(boardStopId)}` : '';
+      legs.push({ type: 'board', label: `Board Route ${e.route}${stopPart} (avg wait ${round1(e.weight_min)} min)`, min: e.weight_min });
       i++; continue;
     }
 
     if (e.type === 'transfer') {
       waitTotal += e.weight_min;
-      legs.push({ type: 'transfer', label: `Transfer to Route ${e.route} (wait + interchange, ${round1(e.weight_min)} min)`, min: e.weight_min });
+      const transferStopId = graph.nodes[e.from]?.stop_id;
+      const stopPart = stopNames.get(transferStopId) ? ` at ${stopNames.get(transferStopId)}` : '';
+      legs.push({ type: 'transfer', label: `Transfer to Route ${e.route}${stopPart} (wait + interchange, ${round1(e.weight_min)} min)`, min: e.weight_min });
       i++; continue;
     }
 
