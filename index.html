@@ -14,18 +14,22 @@
     <div id="map"></div>
 
     <aside id="panel">
+      <div id="panel-header">
+        <span id="panel-title">Journey Planner</span>
+        <div class="button-row">
+          <button id="reset-btn" class="btn-secondary">Reset</button>
+          <button id="share-btn" class="btn-secondary hidden">Share</button>
+        </div>
+      </div>
+
       <div id="tabs" role="tablist">
         <button id="tab-journey" class="tab-btn active" data-tab="journey" role="tab" aria-selected="true">Journey</button>
         <button id="tab-isochrone" class="tab-btn" data-tab="isochrone" role="tab" aria-selected="false">Isochrone</button>
       </div>
 
       <div id="journey-panel" class="tab-panel">
-        <div id="instructions" class="panel-block">
+        <div id="instructions" class="instruction-banner">
           <p id="instruction-text">Click the map to set your <strong>origin</strong>.</p>
-          <div class="button-row">
-            <button id="reset-btn" class="btn-secondary">Reset</button>
-            <button id="share-btn" class="btn-secondary hidden">Share</button>
-          </div>
         </div>
 
         <div id="combo-selector" class="panel-block hidden">
@@ -59,7 +63,7 @@
           </label>
         </div>
 
-        <div id="iso-instructions" class="panel-block">
+        <div id="iso-instructions" class="instruction-banner">
           <p id="iso-instruction-text">Click the map to see how far you can travel in <strong>20</strong>, <strong>40</strong>, and <strong>60</strong> minutes.</p>
           <div class="button-row">
             <button id="iso-reset-btn" class="btn-secondary">Reset</button>

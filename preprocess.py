@@ -66,8 +66,6 @@ TRAM_FREQUENCY = 10            # universal tram frequency, same treatment as tra
 TRAM_COLOR = "#91DE56"
 EXIST_BUS_COLOR = "#ff8200"    # existing (non-reform) metro bus network - must match
                                 # RIDE_COLOR_EXIST_BUS in app.js
-EXIST_BUS_DEFAULT_FREQUENCY = 300  # fallback headway (min) for any route missing from
-                                    # BUS_FREQUENCY_JSON
 
 WGS84 = "EPSG:4326"
 METRIC = "EPSG:28355"  # GDA94 / MGA zone 55 - accurate for Melbourne
@@ -164,7 +162,6 @@ def load_bus_frequencies(json_path):
 def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt, mode="rail",
                             corridor="RAIL", id_prefix="RAIL",
                             speed_kmh=TRAIN_SPEED_KMH, frequency_min=TRAIN_FREQUENCY,
-                            default_frequency_min=None,
                             color=None, stop_location_types=("1",),
                             route_key_field="route_id",
                             route_types=None,
@@ -175,7 +172,8 @@ def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt, mode="rail",
 
     frequency_min can be a single number (applied to every route) or a dict of
     {route_number: minutes} - e.g. from load_bus_frequencies() - in which case
-    default_frequency_min is used for any route the dict doesn't cover.
+    any route the dict doesn't cover is simply excluded from the output
+    entirely (no fallback/default frequency is applied to it).
 
     route_key_field picks how each GTFS route is matched to its shape:
     - "route_id": derive a short code from route_id via gtfs_route_code()
@@ -269,6 +267,15 @@ def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt, mode="rail",
     routes = {}
     for code, (length_m, coords_latlon) in shapes_by_code.items():
         meta = train_routes[code]
+        if is_freq_lookup:
+            freq = frequency_min.get(meta["route_number"])
+            if freq is None:
+                # No usable frequency data for this route - exclude it
+                # entirely rather than guessing with a default headway.
+                missing_freq_routes.append(meta["route_number"])
+                continue
+        else:
+            freq = frequency_min
         line_wgs = LineString([(lon, lat) for lat, lon in coords_latlon])
         line_m = shapely_transform(to_metric, line_wgs)
         route_id = f"{id_prefix}:{code}"
@@ -276,13 +283,6 @@ def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt, mode="rail",
             display_label = f"{meta['route_number']} {meta['short_name']}".strip()
         else:
             display_label = meta["short_name"]
-        if is_freq_lookup:
-            freq = frequency_min.get(meta["route_number"])
-            if freq is None:
-                freq = default_frequency_min
-                missing_freq_routes.append(meta["route_number"])
-        else:
-            freq = frequency_min
         routes[route_id] = {
             "route_id": route_id,
             "corridor": corridor,
@@ -302,8 +302,8 @@ def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt, mode="rail",
     if missing_freq_routes:
         uniq = sorted(set(missing_freq_routes))
         shown = ", ".join(uniq[:15]) + ("..." if len(uniq) > 15 else "")
-        print(f"  (no frequency match for {len(uniq)} routes, using default "
-              f"{default_frequency_min} min: {shown})")
+        print(f"  (no frequency match for {len(uniq)} routes, excluded "
+              f"entirely: {shown})")
 
     # 6. snap real stations onto every rail line they actually sit on
     #    (a station near several lines -> naturally becomes a shared/interchange stop)
@@ -651,7 +651,7 @@ def build_graph(routes, stops, route_stop_sequences):
     return nodes, edges
 
 
-def add_walk_transfer_edges(nodes, edges, stops, max_walk_m=500):
+def add_walk_transfer_edges(nodes, edges, stops, max_walk_m=1000):
     hub_stops = list(stops.items())
     added = 0
     for (sid_a, a), (sid_b, b) in combinations(hub_stops, 2):
@@ -728,7 +728,6 @@ def main():
         mode="bus", corridor="EXIST_BUS", id_prefix="EBUS",
         speed_kmh=BUS_SPEED_KMH,
         frequency_min=bus_freq_by_route_number,
-        default_frequency_min=EXIST_BUS_DEFAULT_FREQUENCY,
         color=EXIST_BUS_COLOR,
         stop_location_types=("", "0"),
         route_key_field="route_short_name",
@@ -772,8 +771,7 @@ def main():
             "train_frequency": TRAIN_FREQUENCY,
             "B1_frequency": B1_FREQUENCY,
             "B2_frequency": B2_FREQUENCY,
-            "tram_frequency": TRAM_FREQUENCY,
-            "exist_bus_default_frequency": EXIST_BUS_DEFAULT_FREQUENCY
+            "tram_frequency": TRAM_FREQUENCY
         },
         "routes": {rid: {"frequency_min": r["frequency_min"], "corridor": r["corridor"], "mode": r["mode"],
                           **({"color": r["color"]} if "color" in r else {}),

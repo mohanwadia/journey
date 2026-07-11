@@ -17,7 +17,7 @@ const RIDE_COLOR_RAIL = '#0072CE';
 const RIDE_COLOR_DEFAULT = '#ff8200';
 const RIDE_COLOR_SRL = '#008746';
 const RIDE_COLOR_TRAM = '#91DE56';
-const RIDE_COLOR_EXIST_BUS = '#ff8200'; // must match EXIST_BUS_COLOR in preprocess.py
+const RIDE_COLOR_EXIST_BUS = '#ffaf7a'; // must match EXIST_BUS_COLOR in preprocess.py
 
 // Muted/duller version of a bright hex color, used for the background route
 // lines shown before the person has clicked anything - blends toward a
@@ -413,7 +413,23 @@ function findRoute(origin, dest) {
     extraAdj.get(s.id).push(edge);
   }
 
-  return runDijkstra(ORIGIN_ID, DEST_ID, extraAdj);
+  const result = runDijkstra(ORIGIN_ID, DEST_ID, extraAdj);
+  if (result && isWalkingExcessive(result)) return null;
+  return result;
+}
+
+// Treated the same as "no route found": either a single walking stage takes
+// over an hour, or the walking legs across the whole journey add up to over
+// an hour — even if the rest of the journey is on transit.
+const WALK_STAGE_MAX_MIN = 60;
+function isWalkingExcessive(result) {
+  let totalWalkMin = 0;
+  for (const e of result.edges) {
+    if (e.type !== 'walk') continue;
+    if (e.weight_min > WALK_STAGE_MAX_MIN) return true;
+    totalWalkMin += e.weight_min;
+  }
+  return totalWalkMin > WALK_STAGE_MAX_MIN;
 }
 
 // ---------------------------------------------------------------------------
@@ -915,6 +931,7 @@ function comboDisplayMin(key) {
 }
 
 // Filters JOURNEY_COMBOS down to the ones worth showing:
+// - hide any combo with no route at all (nothing to show for that tab)
 // - hide "Both" if it matches "SRL" or "Bus Reform" (nothing new to show)
 // - hide "SRL" (and therefore "Both") if "Current" == "SRL" AND
 //   "Bus Reform" == "Both" — i.e. adding SRL alone changes nothing, and
@@ -932,6 +949,7 @@ function visibleJourneyCombos() {
   const hideSrl = same(current, srl);
 
   return JOURNEY_COMBOS.filter((c) => {
+    if (!journeyResults[c.key]) return false;
     if (c.key === 'both' && hideBoth) return false;
     if (c.key === 'srl' && hideSrl) return false;
     return true;
@@ -965,6 +983,10 @@ function renderComboSelector() {
     if (tb === null) return -1;
     return ta - tb;             // fastest first
   });
+  if (sorted.length === 0) {
+    container.classList.add('hidden');
+    return;
+  }
   for (const combo of sorted) {
     const result = journeyResults[combo.key];
     const btn = document.createElement('button');
@@ -1103,8 +1125,14 @@ function loadFromURL() {
     computeAllJourneyCombos(originLatLng, destLatLng);
     const anyResult = JOURNEY_COMBOS.some((c) => journeyResults[c.key]);
     if (!anyResult) {
-      document.getElementById('instruction-text').textContent =
-        'No route found between the linked points — try clicking closer to the network.';
+      document.getElementById('instruction-text').innerHTML =
+        'Directions could not be found between the linked points — try clicking closer to the network.';
+      document.getElementById('combo-selector').classList.add('hidden');
+      document.getElementById('summary').classList.add('hidden');
+      document.getElementById('itinerary').classList.add('hidden');
+      document.getElementById('empty-state').classList.remove('hidden');
+      document.getElementById('empty-state').innerHTML =
+        '<p>Directions could not be found between those points.</p>';
       syncURL(false);
       return;
     }
@@ -1180,9 +1208,14 @@ function onJourneyClick(e) {
   computeAllJourneyCombos(originLatLng, destLatLng);
   const anyResult = JOURNEY_COMBOS.some((c) => journeyResults[c.key]);
   if (!anyResult) {
-    document.getElementById('instruction-text').textContent =
-      'No route found between those points — try clicking closer to the network.';
+    document.getElementById('instruction-text').innerHTML =
+      'Directions could not be found between those points — try clicking closer to the network.';
     document.getElementById('combo-selector').classList.add('hidden');
+    document.getElementById('summary').classList.add('hidden');
+    document.getElementById('itinerary').classList.add('hidden');
+    document.getElementById('empty-state').classList.remove('hidden');
+    document.getElementById('empty-state').innerHTML =
+      '<p>Directions could not be found between those points.</p>';
     return;
   }
 
