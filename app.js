@@ -52,6 +52,11 @@ let originMarker = null;
 let destMarker = null;
 let pathLayer = null;
 
+let currentTab = 'journey';     // 'journey' | 'isochrone'
+let isoLayer = null;            // layered walking-radius circles
+let isoMarker = null;           // marker at the clicked isochrone origin
+let isoOriginLatLng = null;     // clicked point the isochrone was computed from
+
 const map = L.map('map', { zoomControl: true });
 
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -76,7 +81,7 @@ Promise.all([
   renderRouteLines(routesGeojson);
   renderStopMarkers();
   map.on('click', onMapClick);
-  loadFromPermalink();
+  loadFromURL();
 }).catch(err => {
   document.getElementById('instruction-text').textContent =
     'Could not load network data — check the console. If you opened this file directly, ' +
@@ -300,6 +305,149 @@ function findRoute(origin, dest) {
   }
 
   return runDijkstra(ORIGIN_ID, DEST_ID, extraAdj);
+}
+
+// ---------------------------------------------------------------------------
+// Isochrones
+// ---------------------------------------------------------------------------
+// Approach: run a single-source Dijkstra from the clicked point out to every
+// stop reachable within the largest threshold, then, at each threshold,
+// treat every reachable stop as the center of a walking-distance circle
+// (radius = however many minutes of walking budget are left after arriving
+// there). Layering the circles from the largest threshold up to the
+// smallest — all in one translucent colour — approximates a proper isochrone
+// polygon without needing a geometry/union library.
+
+const ISO_THRESHOLDS_MIN = [15, 30, 45];
+const ISO_MAX_CANDIDATES = 6;
+const ISO_MAX_WALK_TO_STOP_M = 1200;
+const ISO_COLOR = '#1d4ed8';
+const ISO_FILL_OPACITY = { 15: 0.4, 30: 0.24, 45: 0.14 };
+
+// Like runDijkstra, but explores every node within maxCost of startId
+// instead of stopping at a single destination.
+function runDijkstraOneToAll(startId, extraAdj, maxCost) {
+  const getEdges = (nodeId) => (baseAdj.get(nodeId) || []).concat(extraAdj.get(nodeId) || []);
+
+  const dist = new Map([[startId, 0]]);
+  const visited = new Set();
+  const pq = new MinHeap();
+  pq.push({ node: startId, cost: 0 });
+
+  while (pq.size > 0) {
+    const { node, cost } = pq.pop();
+    if (visited.has(node)) continue;
+    visited.add(node);
+    if (cost > maxCost) continue;
+
+    for (const e of getEdges(node)) {
+      const nd = cost + e.weight_min;
+      if (nd > maxCost) continue;
+      if (nd < (dist.get(e.to) ?? Infinity)) {
+        dist.set(e.to, nd);
+        pq.push({ node: e.to, cost: nd });
+      }
+    }
+  }
+
+  return dist;
+}
+
+// Returns a deduped list of { lat, lon, min } — one entry per physical stop
+// location (several graph nodes can share a stop), keeping the fastest
+// arrival time seen for that location. The clicked point itself is included
+// at min: 0 so the pure-walking radius around it is drawn too.
+function computeIsochrone(latlng) {
+  const ORIGIN_ID = 'USER_ISO_ORIGIN';
+  const near = nearestStops(latlng.lat, latlng.lng, hubInNodes, ISO_MAX_CANDIDATES, ISO_MAX_WALK_TO_STOP_M);
+
+  const extraAdj = new Map();
+  extraAdj.set(ORIGIN_ID, near.map((s) => ({
+    from: ORIGIN_ID, to: s.id, type: 'walk',
+    weight_min: s.dist / WALK_SPEED_M_PER_MIN,
+  })));
+
+  const maxMin = ISO_THRESHOLDS_MIN[ISO_THRESHOLDS_MIN.length - 1];
+  const dist = runDijkstraOneToAll(ORIGIN_ID, extraAdj, maxMin);
+
+  const byLoc = new Map(); // stop_id (or node id) -> { lat, lon, min }
+  byLoc.set('origin', { lat: latlng.lat, lon: latlng.lng, min: 0 });
+
+  dist.forEach((min, nodeId) => {
+    if (nodeId === ORIGIN_ID) return;
+    const n = graph.nodes[nodeId];
+    if (!n) return;
+    const key = n.stop_id || nodeId;
+    const existing = byLoc.get(key);
+    if (!existing || min < existing.min) {
+      byLoc.set(key, { lat: n.lat, lon: n.lon, min });
+    }
+  });
+
+  return Array.from(byLoc.values());
+}
+
+// Each threshold gets its own Leaflet pane + canvas renderer so overlapping
+// circles within a single band are drawn fully solid (fillOpacity: 1) and
+// simply merge into one flat shape instead of stacking alpha on top of
+// itself. The per-threshold translucency (ISO_FILL_OPACITY) is then applied
+// exactly once, as the CSS opacity of that pane's already-flattened raster.
+// This stops dense clusters of 45-min circles from compositing into
+// something darker than the 15-min band.
+function getIsoPane(threshold) {
+  const paneName = `iso-pane-${threshold}`;
+  let pane = map.getPane(paneName);
+  if (!pane) {
+    pane = map.createPane(paneName);
+    pane.style.opacity = ISO_FILL_OPACITY[threshold];
+    pane.style.pointerEvents = 'none';
+  }
+  return paneName;
+}
+
+function renderIsochrone(latlng, locations) {
+  if (isoLayer) map.removeLayer(isoLayer);
+  isoLayer = L.layerGroup();
+
+  // Draw the largest (lightest) threshold first so smaller, darker
+  // thresholds' panes sit visually on top of it.
+  const thresholdsLargestFirst = [...ISO_THRESHOLDS_MIN].sort((a, b) => b - a);
+  let zIndex = 400; // below markers/popups, above tile layer
+  for (const threshold of thresholdsLargestFirst) {
+    const paneName = getIsoPane(threshold);
+    map.getPane(paneName).style.zIndex = zIndex++;
+    const canvasRenderer = L.canvas({ pane: paneName });
+    for (const loc of locations) {
+      if (loc.min > threshold) continue;
+      const radiusM = (threshold - loc.min) * WALK_SPEED_M_PER_MIN;
+      if (radiusM <= 0) continue;
+      L.circle([loc.lat, loc.lon], {
+        radius: radiusM,
+        renderer: canvasRenderer,
+        pane: paneName,
+        stroke: false,
+        fillColor: ISO_COLOR,
+        fillOpacity: 1,
+      }).addTo(isoLayer);
+    }
+  }
+
+  isoLayer.addTo(map);
+
+  if (isoMarker) map.removeLayer(isoMarker);
+  isoMarker = L.circleMarker(latlng, {
+    radius: 6, color: '#1a1d1f', weight: 2, fillColor: '#ffffff', fillOpacity: 1,
+  }).addTo(map);
+}
+
+function onIsochroneClick(e) {
+  if (!graph) return;
+  const locations = computeIsochrone(e.latlng);
+  isoOriginLatLng = e.latlng;
+  renderIsochrone(e.latlng, locations);
+  document.getElementById('iso-instruction-text').innerHTML =
+    'Click elsewhere to see travel times from a different point.';
+  syncURL(false);
 }
 
 // ---------------------------------------------------------------------------
@@ -624,8 +772,15 @@ function renderPathOnMap(result) {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Permalinks (?origin=lat,lng&dest=lat,lng)
+// URL routing
 // ---------------------------------------------------------------------------
+// ?mode=journey                                  -> journey tab, no pins
+// ?mode=journey&origin=lat,lng&dest=lat,lng      -> journey tab, both pins placed
+// ?mode=isochrone                                -> isochrone tab, no point
+// ?mode=isochrone&point=lat,lng                  -> isochrone tab, point placed
+//
+// All query params, so this works on any static host with no server-side
+// rewrite rules needed.
 
 function parseLatLngParam(str) {
   if (!str) return null;
@@ -634,41 +789,81 @@ function parseLatLngParam(str) {
   return { lat: parts[0], lng: parts[1] };
 }
 
-function loadFromPermalink() {
-  const params = new URLSearchParams(window.location.search);
-  const o = parseLatLngParam(params.get('origin'));
-  const d = parseLatLngParam(params.get('dest'));
-  if (!o || !d) return;
-
-  originLatLng = L.latLng(o.lat, o.lng);
-  destLatLng = L.latLng(d.lat, d.lng);
-  originMarker = L.circleMarker(originLatLng, { radius: 7, color: '#1a1d1f', weight: 2, fillColor: '#1a1d1f', fillOpacity: 1 }).addTo(map);
-  destMarker = L.marker(destLatLng, { icon: destPinIcon() }).addTo(map);
-  map.fitBounds(L.latLngBounds([originLatLng, destLatLng]), { padding: [80, 80] });
-
-  const result = findRoute(originLatLng, destLatLng);
-  if (!result) {
-    document.getElementById('instruction-text').textContent =
-      'No route found between the linked points — try clicking closer to the network.';
-    return;
-  }
-  renderItinerary(result);
-  renderPathOnMap(result);
-  updatePermalink();
-  document.getElementById('instruction-text').innerHTML = 'Click <strong>Reset</strong> to plan another trip.';
-}
-
-function updatePermalink() {
-  if (!originLatLng || !destLatLng) return;
+// Builds the canonical URL for the current tab + pin state, without
+// navigating anywhere.
+function buildURL() {
   const url = new URL(window.location.href);
   url.search = '';
-  url.searchParams.set('origin', `${originLatLng.lat.toFixed(6)},${originLatLng.lng.toFixed(6)}`);
-  url.searchParams.set('dest', `${destLatLng.lat.toFixed(6)},${destLatLng.lng.toFixed(6)}`);
-  window.history.replaceState({}, '', url);
+  url.searchParams.set('mode', currentTab === 'isochrone' ? 'isochrone' : 'journey');
+  if (currentTab === 'journey' && originLatLng && destLatLng) {
+    url.searchParams.set('origin', `${originLatLng.lat.toFixed(6)},${originLatLng.lng.toFixed(6)}`);
+    url.searchParams.set('dest', `${destLatLng.lat.toFixed(6)},${destLatLng.lng.toFixed(6)}`);
+  } else if (currentTab === 'isochrone' && isoOriginLatLng) {
+    url.searchParams.set('point', `${isoOriginLatLng.lat.toFixed(6)},${isoOriginLatLng.lng.toFixed(6)}`);
+  }
+  return url;
+}
+
+// push: true when switching tabs (adds a back/forward history entry),
+// false when just updating pin data on the tab already showing (replaces
+// the current entry so every map click doesn't spam browser history).
+function syncURL(push) {
+  const url = buildURL();
+  if (push) {
+    window.history.pushState({}, '', url);
+  } else {
+    window.history.replaceState({}, '', url);
+  }
 
   const shareBtn = document.getElementById('share-btn');
-  if (shareBtn) shareBtn.classList.remove('hidden');
+  if (shareBtn) shareBtn.classList.toggle('hidden', !(originLatLng && destLatLng));
 }
+
+// Reads the current URL (path + query) on load or on popstate and applies
+// it to app state: which tab is active, and any pins/point to restore.
+function loadFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get('mode') === 'isochrone' ? 'isochrone' : 'journey';
+  setTab(tab, { fromURL: true });
+
+  if (tab === 'journey') {
+    const o = parseLatLngParam(params.get('origin'));
+    const d = parseLatLngParam(params.get('dest'));
+    if (!o || !d) { syncURL(false); return; }
+
+    originLatLng = L.latLng(o.lat, o.lng);
+    destLatLng = L.latLng(d.lat, d.lng);
+    originMarker = L.circleMarker(originLatLng, { radius: 7, color: '#1a1d1f', weight: 2, fillColor: '#1a1d1f', fillOpacity: 1 }).addTo(map);
+    destMarker = L.marker(destLatLng, { icon: destPinIcon() }).addTo(map);
+    map.fitBounds(L.latLngBounds([originLatLng, destLatLng]), { padding: [80, 80] });
+
+    const result = findRoute(originLatLng, destLatLng);
+    if (!result) {
+      document.getElementById('instruction-text').textContent =
+        'No route found between the linked points — try clicking closer to the network.';
+      syncURL(false);
+      return;
+    }
+    renderItinerary(result);
+    renderPathOnMap(result);
+    document.getElementById('instruction-text').innerHTML = 'Click <strong>Reset</strong> to plan another trip.';
+    syncURL(false);
+  } else {
+    const p = parseLatLngParam(params.get('point'));
+    if (!p || !graph) { syncURL(false); return; }
+
+    const latlng = L.latLng(p.lat, p.lng);
+    const locations = computeIsochrone(latlng);
+    isoOriginLatLng = latlng;
+    renderIsochrone(latlng, locations);
+    map.setView(latlng, map.getZoom() || 14);
+    document.getElementById('iso-instruction-text').innerHTML =
+      'Click elsewhere to see travel times from a different point.';
+    syncURL(false);
+  }
+}
+
+window.addEventListener('popstate', loadFromURL);
 
 function copyShareLink() {
   navigator.clipboard.writeText(window.location.href).then(() => {
@@ -683,6 +878,15 @@ function copyShareLink() {
 }
 
 function onMapClick(e) {
+  if (!graph) return;
+  if (currentTab === 'isochrone') {
+    onIsochroneClick(e);
+  } else {
+    onJourneyClick(e);
+  }
+}
+
+function onJourneyClick(e) {
   if (!graph) return;
 
   if (!originLatLng) {
@@ -708,7 +912,7 @@ function onMapClick(e) {
   }
   renderItinerary(result);
   renderPathOnMap(result);
-  updatePermalink();
+  syncURL(false);
   document.getElementById('instruction-text').innerHTML = 'Click to move your <strong>destination</strong>, or Reset to change your origin.';
 }
 
@@ -724,11 +928,57 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   document.getElementById('empty-state').classList.remove('hidden');
   document.getElementById('instruction-text').innerHTML = 'Click the map to set your <strong>origin</strong>.';
 
-  const shareBtn = document.getElementById('share-btn');
-  if (shareBtn) shareBtn.classList.add('hidden');
-  const url = new URL(window.location.href);
-  url.search = '';
-  window.history.replaceState({}, '', url);
+  syncURL(false);
 });
 
 document.getElementById('share-btn').addEventListener('click', copyShareLink);
+
+// ---------------------------------------------------------------------------
+// Tabs
+// ---------------------------------------------------------------------------
+
+// options.fromURL: true when called from loadFromURL/popstate — in that
+// case the URL already reflects the tab, so we must not push a new history
+// entry (and shouldn't clobber pins that loadFromURL is about to restore).
+function setTab(tab, options = {}) {
+  const { fromURL = false } = options;
+  currentTab = tab;
+
+  document.getElementById('tab-journey').classList.toggle('active', tab === 'journey');
+  document.getElementById('tab-journey').setAttribute('aria-selected', tab === 'journey');
+  document.getElementById('tab-isochrone').classList.toggle('active', tab === 'isochrone');
+  document.getElementById('tab-isochrone').setAttribute('aria-selected', tab === 'isochrone');
+
+  document.getElementById('journey-panel').classList.toggle('hidden', tab !== 'journey');
+  document.getElementById('isochrone-panel').classList.toggle('hidden', tab !== 'isochrone');
+
+  if (tab === 'journey') {
+    if (isoLayer) map.removeLayer(isoLayer);
+    if (isoMarker) map.removeLayer(isoMarker);
+    if (originMarker) originMarker.addTo(map);
+    if (destMarker) destMarker.addTo(map);
+    if (pathLayer) pathLayer.addTo(map);
+  } else {
+    if (originMarker) map.removeLayer(originMarker);
+    if (destMarker) map.removeLayer(destMarker);
+    if (pathLayer) map.removeLayer(pathLayer);
+    if (isoLayer) isoLayer.addTo(map);
+    if (isoMarker) isoMarker.addTo(map);
+  }
+
+  if (!fromURL) syncURL(true);
+}
+
+document.getElementById('tab-journey').addEventListener('click', () => setTab('journey'));
+document.getElementById('tab-isochrone').addEventListener('click', () => setTab('isochrone'));
+
+document.getElementById('iso-reset-btn').addEventListener('click', () => {
+  if (isoLayer) map.removeLayer(isoLayer);
+  if (isoMarker) map.removeLayer(isoMarker);
+  isoLayer = null;
+  isoMarker = null;
+  isoOriginLatLng = null;
+  document.getElementById('iso-instruction-text').innerHTML =
+    'Click the map to see how far you can travel in <strong>15</strong>, <strong>30</strong>, and <strong>45</strong> minutes.';
+  syncURL(false);
+});

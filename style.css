@@ -109,12 +109,62 @@ html, body {
   flex-direction: column;
 }
 
+#tabs {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 13px 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tab-btn:hover { color: var(--ink); }
+.tab-btn.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.tab-panel.hidden { display: none; }
+
 .panel-block {
   padding: 18px 20px;
   border-bottom: 1px solid var(--line);
 }
 
 .panel-block.hidden { display: none; }
+
+.legend-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 10px;
+  border-radius: 3px;
+  vertical-align: middle;
+  background-color: var(--paper);
+}
+.swatch-15 { background-color: rgba(29, 78, 216, 0.55); }
+.swatch-30 { background-color: rgba(29, 78, 216, 0.32); }
+.swatch-45 { background-color: rgba(29, 78, 216, 0.16); }
 
 #instructions p {
   margin: 0 0 10px;
@@ -170,7 +220,8 @@ html, body {
 .time-bar-seg.is-other { background: var(--non-ride); }
 .time-bar-seg.is-ride { background: var(--ride); border-radius: 4px; }
 
-#itinerary h2 {
+#itinerary h2,
+#iso-legend h2 {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;

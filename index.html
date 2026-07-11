@@ -14,27 +14,52 @@
     <div id="map"></div>
 
     <aside id="panel">
-      <div id="instructions" class="panel-block">
-        <p id="instruction-text">Click the map to set your <strong>origin</strong>.</p>
-        <div class="button-row">
-          <button id="reset-btn" class="btn-secondary">Reset</button>
-          <button id="share-btn" class="btn-secondary hidden">Share</button>
+      <div id="tabs" role="tablist">
+        <button id="tab-journey" class="tab-btn active" data-tab="journey" role="tab" aria-selected="true">Journey</button>
+        <button id="tab-isochrone" class="tab-btn" data-tab="isochrone" role="tab" aria-selected="false">Isochrone</button>
+      </div>
+
+      <div id="journey-panel" class="tab-panel">
+        <div id="instructions" class="panel-block">
+          <p id="instruction-text">Click the map to set your <strong>origin</strong>.</p>
+          <div class="button-row">
+            <button id="reset-btn" class="btn-secondary">Reset</button>
+            <button id="share-btn" class="btn-secondary hidden">Share</button>
+          </div>
+        </div>
+
+        <div id="summary" class="panel-block hidden">
+          <div class="summary-total">
+            <span id="total-time">—</span><span class="summary-unit">min</span>
+          </div>
+          <div id="time-bar" class="time-bar"></div>
+        </div>
+
+        <div id="itinerary" class="panel-block hidden">
+          <h2>Journey</h2>
+          <ol id="itinerary-list"></ol>
+        </div>
+
+        <div id="empty-state" class="panel-block"></div>
+      </div>
+
+      <div id="isochrone-panel" class="tab-panel hidden">
+        <div id="iso-instructions" class="panel-block">
+          <p id="iso-instruction-text">Click the map to see how far you can travel in <strong>15</strong>, <strong>30</strong>, and <strong>45</strong> minutes.</p>
+          <div class="button-row">
+            <button id="iso-reset-btn" class="btn-secondary">Reset</button>
+          </div>
+        </div>
+
+        <div id="iso-legend" class="panel-block">
+          <h2>Travel time</h2>
+          <ul class="legend-list">
+            <li><span class="legend-swatch swatch-15"></span>Within 15 min</li>
+            <li><span class="legend-swatch swatch-30"></span>Within 30 min</li>
+            <li><span class="legend-swatch swatch-45"></span>Within 45 min</li>
+          </ul>
         </div>
       </div>
-
-      <div id="summary" class="panel-block hidden">
-        <div class="summary-total">
-          <span id="total-time">—</span><span class="summary-unit">min</span>
-        </div>
-        <div id="time-bar" class="time-bar"></div>
-      </div>
-
-      <div id="itinerary" class="panel-block hidden">
-        <h2>Journey</h2>
-        <ol id="itinerary-list"></ol>
-      </div>
-
-      <div id="empty-state" class="panel-block"></div>
     </aside>
   </main>
 </div>
