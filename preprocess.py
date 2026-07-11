@@ -790,6 +790,5 @@ def main():
     export_debug_geojson(stops, OUTPUT_STOPS_DEBUG)
     print(f"Wrote {OUTPUT_STOPS_DEBUG}")
 
-
 if __name__ == "__main__":
     main()
