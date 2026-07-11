@@ -115,6 +115,28 @@ html, body {
   border-bottom: 1px solid var(--line);
 }
 
+#layers-panel {
+  flex-shrink: 0;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-row input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .tab-btn {
   flex: 1;
   padding: 13px 10px;

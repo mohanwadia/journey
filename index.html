@@ -14,6 +14,13 @@
     <div id="map"></div>
 
     <aside id="panel">
+      <div id="layers-panel" class="panel-block">
+        <label class="toggle-row">
+          <input type="checkbox" id="srl-toggle" checked />
+          <span>Suburban Rail Loop</span>
+        </label>
+      </div>
+
       <div id="tabs" role="tablist">
         <button id="tab-journey" class="tab-btn active" data-tab="journey" role="tab" aria-selected="true">Journey</button>
         <button id="tab-isochrone" class="tab-btn" data-tab="isochrone" role="tab" aria-selected="false">Isochrone</button>
@@ -45,7 +52,7 @@
 
       <div id="isochrone-panel" class="tab-panel hidden">
         <div id="iso-instructions" class="panel-block">
-          <p id="iso-instruction-text">Click the map to see how far you can travel in <strong>15</strong>, <strong>30</strong>, and <strong>45</strong> minutes.</p>
+          <p id="iso-instruction-text">Click the map to see how far you can travel in <strong>20</strong>, <strong>40</strong>, and <strong>60</strong> minutes.</p>
           <div class="button-row">
             <button id="iso-reset-btn" class="btn-secondary">Reset</button>
           </div>
@@ -54,9 +61,9 @@
         <div id="iso-legend" class="panel-block">
           <h2>Travel time</h2>
           <ul class="legend-list">
-            <li><span class="legend-swatch swatch-15"></span>Within 15 min</li>
-            <li><span class="legend-swatch swatch-30"></span>Within 30 min</li>
-            <li><span class="legend-swatch swatch-45"></span>Within 45 min</li>
+            <li><span class="legend-swatch swatch-15"></span>Within 20 min</li>
+            <li><span class="legend-swatch swatch-30"></span>Within 40 min</li>
+            <li><span class="legend-swatch swatch-45"></span>Within 60 min</li>
           </ul>
         </div>
       </div>

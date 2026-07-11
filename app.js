@@ -52,6 +52,10 @@ let originMarker = null;
 let destMarker = null;
 let pathLayer = null;
 
+let srlEnabled = true;          // whether Suburban Rail Loop edges/lines are usable & shown
+let srlRouteLayer = null;       // the SRL line geometry (toggled on/off the map)
+let srlStopMarkers = [];        // SRL station dot markers (added/removed from stopMarkersLayer)
+
 let currentTab = 'journey';     // 'journey' | 'isochrone'
 let isoLayer = null;            // layered walking-radius circles
 let isoMarker = null;           // marker at the clicked isochrone origin
@@ -76,6 +80,11 @@ Promise.all([
 ]).then(([graphData, routesGeojson, stopNamesData]) => {
   graph = graphData;
   stopNames = new Map(Object.entries(stopNamesData));
+
+  srlEnabled = new URLSearchParams(window.location.search).get('srl') !== '0';
+  const srlToggle = document.getElementById('srl-toggle');
+  if (srlToggle) srlToggle.checked = srlEnabled;
+
   buildAdjacency();
   buildStopIndex();
   renderRouteLines(routesGeojson);
@@ -91,13 +100,22 @@ Promise.all([
 });
 
 function buildAdjacency() {
-  for (const e of graph.edges) {
-    if (!baseAdj.has(e.from)) baseAdj.set(e.from, []);
-    baseAdj.get(e.from).push(e);
-  }
   for (const [id, n] of Object.entries(graph.nodes)) {
     if (n.type === 'hub_in') hubInNodes.push({ id, lat: n.lat, lon: n.lon });
     if (n.type === 'hub_out') hubOutNodes.push({ id, lat: n.lat, lon: n.lon });
+  }
+  rebuildAdjacency();
+}
+
+// Rebuilds the routing edge index from scratch, skipping SRL edges when the
+// line is toggled off. Cheap enough to call on every toggle — the graph is
+// small — and simpler than patching a live adjacency map in place.
+function rebuildAdjacency() {
+  baseAdj = new Map();
+  for (const e of graph.edges) {
+    if (!srlEnabled && e.route === 'RAIL:SRL') continue;
+    if (!baseAdj.has(e.from)) baseAdj.set(e.from, []);
+    baseAdj.get(e.from).push(e);
   }
 }
 
@@ -112,6 +130,7 @@ function buildStopIndex() {
 
 function renderStopMarkers() {
   stopMarkersLayer = L.layerGroup();
+  srlStopMarkers = [];
   for (const [stopId, name] of stopNames.entries()) {
     // any hub_in node for this stop gives us its coordinates
     const node = Object.values(graph.nodes).find(n => n.stop_id === stopId && n.type === 'hub_in');
@@ -119,7 +138,13 @@ function renderStopMarkers() {
     const marker = L.circleMarker([node.lat, node.lon], {
       radius: 3, weight: 1, color: '#1a1d1f', fillColor: '#f7f6f3', fillOpacity: 1,
     }).bindPopup(name);
-    stopMarkersLayer.addLayer(marker);
+
+    if (stopId.startsWith('SRL_S')) {
+      srlStopMarkers.push(marker);
+      if (srlEnabled) stopMarkersLayer.addLayer(marker);
+    } else {
+      stopMarkersLayer.addLayer(marker);
+    }
   }
 
   const STOP_MARKER_MIN_ZOOM = 15;
@@ -134,33 +159,45 @@ function renderStopMarkers() {
   updateVisibility();
 }
 
+function routeLineStyle(feature) {
+  const corridor = feature.properties.corridor;
+  if (corridor === 'RAIL') {
+    const base = feature.properties.color || RIDE_COLOR_RAIL;
+    return { color: dullColor(base), weight: 5, opacity: 0.75 };
+  }
+  if (corridor === 'SRL') {
+    const base = feature.properties.color || RIDE_COLOR_SRL;
+    return { color: dullColor(base), weight: 5, opacity: 0.75 };
+  }
+  if (corridor === 'TRAM') {
+    const base = feature.properties.color || RIDE_COLOR_TRAM;
+    return { color: dullColor(base), weight: 3.5, opacity: 0.75 };
+  }
+  const isB1 = corridor === 'B1';
+  return {
+    color: dullColor(isB1 ? RIDE_COLOR_B1 : RIDE_COLOR_B2),
+    weight: isB1 ? 3 : 2.2,
+    opacity: isB1 ? 0.75 : 0.55,
+  };
+}
+
 function renderRouteLines(routesGeojson) {
-  const layer = L.geoJSON(routesGeojson, {
+  const srlFeatures = routesGeojson.features.filter((f) => f.properties.corridor === 'SRL');
+  const otherFeatures = routesGeojson.features.filter((f) => f.properties.corridor !== 'SRL');
+
+  L.geoJSON({ type: 'FeatureCollection', features: otherFeatures }, {
     interactive: false, // let clicks pass through to the map
-    style: (feature) => {
-      const corridor = feature.properties.corridor;
-      if (corridor === 'RAIL') {
-        const base = feature.properties.color || RIDE_COLOR_RAIL;
-        return { color: dullColor(base), weight: 5, opacity: 0.75 };
-      }
-      if (corridor === 'SRL') {
-        const base = feature.properties.color || RIDE_COLOR_SRL;
-        return { color: dullColor(base), weight: 5, opacity: 0.75 };
-      }
-      if (corridor === 'TRAM') {
-        const base = feature.properties.color || RIDE_COLOR_TRAM;
-        return { color: dullColor(base), weight: 3.5, opacity: 0.75 };
-      }
-      const isB1 = corridor === 'B1';
-      return {
-        color: dullColor(isB1 ? RIDE_COLOR_B1 : RIDE_COLOR_B2),
-        weight: isB1 ? 3 : 2.2,
-        opacity: isB1 ? 0.75 : 0.55,
-      };
-    },
+    style: routeLineStyle,
   }).addTo(map);
 
-  map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+  srlRouteLayer = L.geoJSON({ type: 'FeatureCollection', features: srlFeatures }, {
+    interactive: false,
+    style: routeLineStyle,
+  });
+  if (srlEnabled) srlRouteLayer.addTo(map);
+
+  const fullLayer = L.geoJSON(routesGeojson);
+  map.fitBounds(fullLayer.getBounds(), { padding: [30, 30] });
 }
 
 // ---------------------------------------------------------------------------
@@ -318,11 +355,11 @@ function findRoute(origin, dest) {
 // smallest — all in one translucent colour — approximates a proper isochrone
 // polygon without needing a geometry/union library.
 
-const ISO_THRESHOLDS_MIN = [15, 30, 45];
+const ISO_THRESHOLDS_MIN = [20, 40, 60];
 const ISO_MAX_CANDIDATES = 6;
 const ISO_MAX_WALK_TO_STOP_M = 1200;
 const ISO_COLOR = '#1d4ed8';
-const ISO_FILL_OPACITY = { 15: 0.4, 30: 0.24, 45: 0.14 };
+const ISO_FILL_OPACITY = { 20: 0.4, 40: 0.24, 60: 0.14 };
 
 // Like runDijkstra, but explores every node within maxCost of startId
 // instead of stopping at a single destination.
@@ -795,6 +832,7 @@ function buildURL() {
   const url = new URL(window.location.href);
   url.search = '';
   url.searchParams.set('mode', currentTab === 'isochrone' ? 'isochrone' : 'journey');
+  if (!srlEnabled) url.searchParams.set('srl', '0');
   if (currentTab === 'journey' && originLatLng && destLatLng) {
     url.searchParams.set('origin', `${originLatLng.lat.toFixed(6)},${originLatLng.lng.toFixed(6)}`);
     url.searchParams.set('dest', `${destLatLng.lat.toFixed(6)},${destLatLng.lng.toFixed(6)}`);
@@ -979,6 +1017,58 @@ document.getElementById('iso-reset-btn').addEventListener('click', () => {
   isoMarker = null;
   isoOriginLatLng = null;
   document.getElementById('iso-instruction-text').innerHTML =
-    'Click the map to see how far you can travel in <strong>15</strong>, <strong>30</strong>, and <strong>45</strong> minutes.';
+    'Click the map to see how far you can travel in <strong>20</strong>, <strong>40</strong>, and <strong>60</strong> minutes.';
   syncURL(false);
 });
+
+// ---------------------------------------------------------------------------
+// SRL toggle
+// ---------------------------------------------------------------------------
+// Lets the user exclude the Suburban Rail Loop from routing entirely, to
+// compare journeys/isochrones with and without it. Affects both tabs.
+
+// Re-runs whatever's currently on screen after the SRL edges change.
+function recomputeCurrentView() {
+  if (currentTab === 'journey') {
+    if (!originLatLng || !destLatLng) return;
+    const result = findRoute(originLatLng, destLatLng);
+    if (!result) {
+      if (pathLayer) map.removeLayer(pathLayer);
+      pathLayer = null;
+      document.getElementById('summary').classList.add('hidden');
+      document.getElementById('itinerary').classList.add('hidden');
+      document.getElementById('empty-state').classList.remove('hidden');
+      document.getElementById('instruction-text').textContent =
+        'No route found with the current line selection — try re-enabling the SRL.';
+      return;
+    }
+    renderItinerary(result);
+    renderPathOnMap(result);
+  } else if (currentTab === 'isochrone') {
+    if (!isoOriginLatLng) return;
+    const locations = computeIsochrone(isoOriginLatLng);
+    renderIsochrone(isoOriginLatLng, locations);
+  }
+}
+
+function setSrlEnabled(enabled) {
+  srlEnabled = enabled;
+  rebuildAdjacency();
+
+  if (srlRouteLayer) {
+    if (enabled) srlRouteLayer.addTo(map);
+    else map.removeLayer(srlRouteLayer);
+  }
+  for (const m of srlStopMarkers) {
+    if (enabled) stopMarkersLayer.addLayer(m);
+    else stopMarkersLayer.removeLayer(m);
+  }
+
+  recomputeCurrentView();
+  syncURL(false);
+}
+
+const srlToggleEl = document.getElementById('srl-toggle');
+if (srlToggleEl) {
+  srlToggleEl.addEventListener('change', (e) => setSrlEnabled(e.target.checked));
+}
