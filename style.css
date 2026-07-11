@@ -3,8 +3,8 @@
   --paper: #f7f6f3;
   --panel: #ffffff;
   --line: #e2ded5;
-  --b1: #DA291C;
-  --b2: #ff8200;
+  --b1: #D92B26;
+  --b2: #F1B80E;
   --rail: #0072CE;
   --accent: #1d4ed8;
   --origin: #2f6f4f;
@@ -12,7 +12,7 @@
   --muted: #6b6a65;
   --ride: #ff8200;
   --non-ride: #333434;
-  --exist-bus: #5C6672;
+  --exist-bus: #ff8200;
   --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -215,6 +215,60 @@ html, body {
   color: var(--muted);
 }
 .btn-secondary:hover { border-color: var(--ink); color: var(--ink); }
+
+.combo-row {
+  display: flex;
+  gap: 6px;
+}
+
+.combo-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+.combo-btn:hover { border-color: var(--muted); }
+
+.combo-btn.active {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.combo-btn.active .combo-label,
+.combo-btn.active .combo-time {
+  color: var(--paper);
+}
+
+.combo-btn.unavailable {
+  opacity: 0.45;
+  cursor: default;
+}
+.combo-btn.unavailable:hover { border-color: var(--line); }
+.combo-btn.unavailable.active { opacity: 0.7; }
+
+.combo-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.combo-time {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
 
 #summary { text-align: left; }
 

@@ -4,7 +4,7 @@
  */
 
 const WALK_SPEED_M_PER_MIN = 80;      // must match preprocess.py's constant
-const MAX_WALK_TO_STOP_M = 900;       // how far we'll look for a boarding/alighting stop
+const MAX_WALK_TO_STOP_M = 5000;       // how far we'll look for a boarding/alighting stop
 const NEAREST_STOP_CANDIDATES = 4;    // don't just take the closest stop — give the router options
 
 // Map styling
@@ -64,6 +64,17 @@ let reformBusLayer = null;          // hand-drawn reform bus route lines
 let existingBusLayer = null;        // real GTFS existing bus route lines
 let reformBusStopMarkers = [];      // stop dots that belong only to the reform network
 let existingBusStopMarkers = [];    // stop dots that belong only to the existing network
+
+// The four network combinations shown side-by-side on the Journey tab.
+// Order matters: this is the display order requested — Current, Bus Reform, SRL, Both.
+const JOURNEY_COMBOS = [
+  { key: 'current', label: 'Current', srl: false, busReform: false },
+  { key: 'busReform', label: 'Bus Reform', srl: false, busReform: true },
+  { key: 'srl', label: 'SRL', srl: true, busReform: false },
+  { key: 'both', label: 'Both', srl: true, busReform: true },
+];
+let journeyCombo = 'current';   // which of JOURNEY_COMBOS is currently shown on the map/itinerary
+let journeyResults = {};        // combo key -> findRoute() result (or null if no route for that combo)
 
 let currentTab = 'journey';     // 'journey' | 'isochrone'
 let isoLayer = null;            // layered walking-radius circles
@@ -418,7 +429,7 @@ function findRoute(origin, dest) {
 
 const ISO_THRESHOLDS_MIN = [20, 40, 60];
 const ISO_MAX_CANDIDATES = 6;
-const ISO_MAX_WALK_TO_STOP_M = 1200;
+const ISO_MAX_WALK_TO_STOP_M = 5000;
 const ISO_COLOR = '#1d4ed8';
 const ISO_FILL_OPACITY = { 20: 0.4, 40: 0.24, 60: 0.14 };
 
@@ -709,7 +720,7 @@ function renderItinerary(result) {
       if (leg.type === 'ride') {
         seg.style.background = routeColor(leg.route);
       }
-      seg.title = `${leg.label} — ${Math.round(leg.min)} min`;
+      seg.title = ``;
       timeBar.appendChild(seg);
     }
   }
@@ -743,7 +754,7 @@ function renderItinerary(result) {
       const stopLabelText = leg.stopCount === 1 ? '1 stop' : `${leg.stopCount} stops`;
       content.innerHTML =
         `<span class="leg-route-name">${leg.label}</span>` +
-        `<span class="leg-sub">${Math.round(leg.min)} min, ${stopLabelText}</span>`;
+        `<span class="leg-sub">${Math.round(leg.min)} min</span>`;
     } else {
       content.innerHTML = `<span class="leg-main">${group.mainLabel} ${Math.round(group.mainMin)} min</span>` +
         (group.subLabel ? `<span class="leg-sub">${group.subLabel} ${Math.round(group.subMin)} min</span>` : '');
@@ -867,6 +878,132 @@ function renderPathOnMap(result) {
 }
 
 // ---------------------------------------------------------------------------
+// Journey combo selector (Current / Bus Reform / SRL / Both)
+// ---------------------------------------------------------------------------
+// The journey tab no longer has its own checkboxes — instead it runs the
+// route for all four SRL/Bus Reform combinations up front and lets the
+// person flip between the results. Network state (routing graph + map
+// layers) always reflects whichever combo is currently selected.
+
+// Computes findRoute() for all four combos, temporarily swapping the global
+// network state to do so. Leaves srlEnabled/busReformEnabled as they were
+// before the call — callers apply the combo they actually want to show via
+// selectJourneyCombo() right after.
+function computeAllJourneyCombos(origin, dest) {
+  const savedSrl = srlEnabled;
+  const savedBusReform = busReformEnabled;
+
+  journeyResults = {};
+  for (const combo of JOURNEY_COMBOS) {
+    srlEnabled = combo.srl;
+    busReformEnabled = combo.busReform;
+    rebuildAdjacency();
+    journeyResults[combo.key] = findRoute(origin, dest);
+  }
+
+  srlEnabled = savedSrl;
+  busReformEnabled = savedBusReform;
+  rebuildAdjacency();
+}
+
+// Rounds a combo's total time the same way the button displays it, so
+// "same time" comparisons match what the person actually sees. Returns
+// null for combos with no route (never treated as equal to anything).
+function comboDisplayMin(key) {
+  const result = journeyResults[key];
+  return result ? Math.round(result.totalMin) : null;
+}
+
+// Filters JOURNEY_COMBOS down to the ones worth showing:
+// - hide "Both" if it matches "SRL" or "Bus Reform" (nothing new to show)
+// - hide "SRL" (and therefore "Both") if "Current" == "SRL" AND
+//   "Bus Reform" == "Both" — i.e. adding SRL alone changes nothing, and
+//   adding SRL on top of Bus Reform also changes nothing, so SRL is dead
+//   weight as an option.
+function visibleJourneyCombos() {
+  const same = (a, b) => a !== null && b !== null && a === b;
+
+  const current = comboDisplayMin('current');
+  const busReform = comboDisplayMin('busReform');
+  const srl = comboDisplayMin('srl');
+  const both = comboDisplayMin('both');
+
+  let hideBoth = same(srl, both) || same(busReform, both);
+  let hideSrl = false;
+  if (same(current, srl) && same(busReform, both)) {
+    hideSrl = true;
+    hideBoth = true;
+  }
+
+  return JOURNEY_COMBOS.filter((c) => {
+    if (c.key === 'both' && hideBoth) return false;
+    if (c.key === 'srl' && hideSrl) return false;
+    return true;
+  });
+}
+
+// Builds the four-button row showing each combo's total time, highlighting
+// whichever is currently selected and dimming any with no route.
+function renderComboSelector() {
+  const container = document.getElementById('combo-selector');
+  const row = document.getElementById('combo-buttons');
+  if (!container || !row) return;
+
+  row.innerHTML = '';
+  for (const combo of visibleJourneyCombos()) {
+    const result = journeyResults[combo.key];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'combo-btn' +
+      (combo.key === journeyCombo ? ' active' : '') +
+      (!result ? ' unavailable' : '');
+    btn.innerHTML =
+      `<span class="combo-label">${combo.label}</span>` +
+      `<span class="combo-time">${result ? Math.round(result.totalMin) + ' min' : '—'}</span>`;
+    btn.addEventListener('click', () => selectJourneyCombo(combo.key));
+    row.appendChild(btn);
+  }
+  container.classList.remove('hidden');
+}
+
+// Switches the journey tab to show a given combo's itinerary/path, and
+// updates the map's routing graph + layers to match it. If the requested
+// combo has been deduped out (see visibleJourneyCombos), falls back to the
+// equivalent combo that's still shown.
+function selectJourneyCombo(key) {
+  const visible = visibleJourneyCombos();
+  if (!visible.some((c) => c.key === key)) {
+    // "Both" collapses into whichever of SRL/Bus Reform it matched; "SRL"
+    // collapses into "Current". Either way, fall back to the first visible
+    // combo with a route, defaulting to "current".
+    key = (visible.find((c) => journeyResults[c.key]) || visible[0] || JOURNEY_COMBOS[0]).key;
+  }
+
+  const combo = JOURNEY_COMBOS.find((c) => c.key === key);
+  if (!combo) return;
+
+  journeyCombo = key;
+  applyNetworkState(combo.srl, combo.busReform);
+  renderComboSelector();
+
+  const result = journeyResults[key];
+  if (!result) {
+    if (pathLayer) map.removeLayer(pathLayer);
+    pathLayer = null;
+    document.getElementById('summary').classList.add('hidden');
+    document.getElementById('itinerary').classList.add('hidden');
+    document.getElementById('empty-state').classList.remove('hidden');
+    document.getElementById('empty-state').innerHTML =
+      `<p>No route found for the "${combo.label}" network — try one of the other options above.</p>`;
+    return;
+  }
+
+  document.getElementById('empty-state').innerHTML = '';
+  renderItinerary(result);
+  renderPathOnMap(result);
+}
+
+// ---------------------------------------------------------------------------
 // Interaction
 // ---------------------------------------------------------------------------
 
@@ -938,15 +1075,26 @@ function loadFromURL() {
     destMarker = L.marker(destLatLng, { icon: destPinIcon() }).addTo(map);
     map.fitBounds(L.latLngBounds([originLatLng, destLatLng]), { padding: [80, 80] });
 
-    const result = findRoute(originLatLng, destLatLng);
-    if (!result) {
+    computeAllJourneyCombos(originLatLng, destLatLng);
+    const anyResult = JOURNEY_COMBOS.some((c) => journeyResults[c.key]);
+    if (!anyResult) {
       document.getElementById('instruction-text').textContent =
         'No route found between the linked points — try clicking closer to the network.';
       syncURL(false);
       return;
     }
-    renderItinerary(result);
-    renderPathOnMap(result);
+
+    // The URL's srl/busReform params (if any) pick which combo to open with;
+    // otherwise default to "Current", falling back to the first combo that
+    // actually has a route.
+    const requestedSrl = params.get('srl') !== '0';
+    const requestedBusReform = params.get('busReform') !== '0';
+    const requestedCombo = JOURNEY_COMBOS.find((c) => c.srl === requestedSrl && c.busReform === requestedBusReform);
+    const comboToSelect = (requestedCombo && journeyResults[requestedCombo.key])
+      ? requestedCombo.key
+      : (journeyResults.current ? 'current' : JOURNEY_COMBOS.find((c) => journeyResults[c.key]).key);
+
+    selectJourneyCombo(comboToSelect);
     document.getElementById('instruction-text').innerHTML = 'Click <strong>Reset</strong> to plan another trip.';
     syncURL(false);
   } else {
@@ -1005,14 +1153,22 @@ function onJourneyClick(e) {
   if (destMarker) map.removeLayer(destMarker);
   destMarker = L.marker(e.latlng, { icon: destPinIcon() }).addTo(map);
 
-  const result = findRoute(originLatLng, destLatLng);
-  if (!result) {
+  computeAllJourneyCombos(originLatLng, destLatLng);
+  const anyResult = JOURNEY_COMBOS.some((c) => journeyResults[c.key]);
+  if (!anyResult) {
     document.getElementById('instruction-text').textContent =
       'No route found between those points — try clicking closer to the network.';
+    document.getElementById('combo-selector').classList.add('hidden');
     return;
   }
-  renderItinerary(result);
-  renderPathOnMap(result);
+
+  // Keep showing whichever combo was already selected, if it still has a
+  // route; otherwise fall back to the first combo that does.
+  const comboToSelect = journeyResults[journeyCombo]
+    ? journeyCombo
+    : JOURNEY_COMBOS.find((c) => journeyResults[c.key]).key;
+  selectJourneyCombo(comboToSelect);
+
   syncURL(false);
   document.getElementById('instruction-text').innerHTML = 'Click to move your <strong>destination</strong>, or Reset to change your origin.';
 }
@@ -1020,15 +1176,20 @@ function onJourneyClick(e) {
 document.getElementById('reset-btn').addEventListener('click', () => {
   originLatLng = null;
   destLatLng = null;
+  journeyResults = {};
+  journeyCombo = 'current';
   if (originMarker) map.removeLayer(originMarker);
   if (destMarker) map.removeLayer(destMarker);
   if (pathLayer) map.removeLayer(pathLayer);
   originMarker = destMarker = pathLayer = null;
+  document.getElementById('combo-selector').classList.add('hidden');
   document.getElementById('summary').classList.add('hidden');
   document.getElementById('itinerary').classList.add('hidden');
   document.getElementById('empty-state').classList.remove('hidden');
+  document.getElementById('empty-state').innerHTML = '';
   document.getElementById('instruction-text').innerHTML = 'Click the map to set your <strong>origin</strong>.';
 
+  applyNetworkState(false, false); // back to the "Current" network for the next trip
   syncURL(false);
 });
 
@@ -1059,12 +1220,27 @@ function setTab(tab, options = {}) {
     if (originMarker) originMarker.addTo(map);
     if (destMarker) destMarker.addTo(map);
     if (pathLayer) pathLayer.addTo(map);
+
+    // The journey tab's network state is driven by the combo selector, not
+    // the isochrone tab's checkboxes — reapply whichever combo is selected.
+    const combo = JOURNEY_COMBOS.find((c) => c.key === journeyCombo) || JOURNEY_COMBOS[0];
+    if (graph) applyNetworkState(combo.srl, combo.busReform);
   } else {
     if (originMarker) map.removeLayer(originMarker);
     if (destMarker) map.removeLayer(destMarker);
     if (pathLayer) map.removeLayer(pathLayer);
     if (isoLayer) isoLayer.addTo(map);
     if (isoMarker) isoMarker.addTo(map);
+
+    // Restore whatever the isochrone checkboxes are set to.
+    const srlToggle = document.getElementById('srl-toggle');
+    const busReformToggle = document.getElementById('bus-reform-toggle');
+    if (graph) {
+      applyNetworkState(
+        srlToggle ? srlToggle.checked : srlEnabled,
+        busReformToggle ? busReformToggle.checked : busReformEnabled
+      );
+    }
   }
 
   if (!fromURL) syncURL(true);
@@ -1090,44 +1266,50 @@ document.getElementById('iso-reset-btn').addEventListener('click', () => {
 // Lets the user exclude the Suburban Rail Loop from routing entirely, to
 // compare journeys/isochrones with and without it. Affects both tabs.
 
-// Re-runs whatever's currently on screen after the SRL edges change.
-function recomputeCurrentView() {
-  if (currentTab === 'journey') {
-    if (!originLatLng || !destLatLng) return;
-    const result = findRoute(originLatLng, destLatLng);
-    if (!result) {
-      if (pathLayer) map.removeLayer(pathLayer);
-      pathLayer = null;
-      document.getElementById('summary').classList.add('hidden');
-      document.getElementById('itinerary').classList.add('hidden');
-      document.getElementById('empty-state').classList.remove('hidden');
-      document.getElementById('instruction-text').textContent =
-        'No route found with the current line selection — try re-enabling the SRL or switching bus networks.';
-      return;
-    }
-    renderItinerary(result);
-    renderPathOnMap(result);
-  } else if (currentTab === 'isochrone') {
-    if (!isoOriginLatLng) return;
-    const locations = computeIsochrone(isoOriginLatLng);
-    renderIsochrone(isoOriginLatLng, locations);
-  }
-}
-
-function setSrlEnabled(enabled) {
-  srlEnabled = enabled;
+// Applies a given SRL/Bus Reform combination to the routing graph and to the
+// map layers (route lines + stop markers). Used both by the isochrone tab's
+// checkboxes and by the journey tab's four-way combo selector, so all
+// network-state changes flow through one place.
+function applyNetworkState(srl, busReform) {
+  srlEnabled = srl;
+  busReformEnabled = busReform;
   rebuildAdjacency();
 
   if (srlRouteLayer) {
-    if (enabled) srlRouteLayer.addTo(map);
+    if (srlEnabled) srlRouteLayer.addTo(map);
     else map.removeLayer(srlRouteLayer);
   }
   for (const m of srlStopMarkers) {
-    if (enabled) stopMarkersLayer.addLayer(m);
+    if (srlEnabled) stopMarkersLayer.addLayer(m);
     else stopMarkersLayer.removeLayer(m);
   }
 
-  recomputeCurrentView();
+  if (reformBusLayer) {
+    if (busReformEnabled) reformBusLayer.addTo(map); else map.removeLayer(reformBusLayer);
+  }
+  if (existingBusLayer) {
+    if (busReformEnabled) map.removeLayer(existingBusLayer); else existingBusLayer.addTo(map);
+  }
+  for (const m of reformBusStopMarkers) {
+    if (busReformEnabled) stopMarkersLayer.addLayer(m); else stopMarkersLayer.removeLayer(m);
+  }
+  for (const m of existingBusStopMarkers) {
+    if (busReformEnabled) stopMarkersLayer.removeLayer(m); else stopMarkersLayer.addLayer(m);
+  }
+}
+
+// Re-runs the isochrone after its SRL/Bus Reform checkboxes change. The
+// journey tab has its own recompute path (computeAllJourneyCombos +
+// selectJourneyCombo), triggered by map clicks rather than checkboxes.
+function recomputeIsochroneView() {
+  if (!isoOriginLatLng) return;
+  const locations = computeIsochrone(isoOriginLatLng);
+  renderIsochrone(isoOriginLatLng, locations);
+}
+
+function setSrlEnabled(enabled) {
+  applyNetworkState(enabled, busReformEnabled);
+  recomputeIsochroneView();
   syncURL(false);
 }
 
@@ -1145,23 +1327,8 @@ if (srlToggleEl) {
 // (EXIST_BUS corridor, shown when unchecked).
 
 function setBusReformEnabled(enabled) {
-  busReformEnabled = enabled;
-  rebuildAdjacency();
-
-  if (reformBusLayer) {
-    if (enabled) reformBusLayer.addTo(map); else map.removeLayer(reformBusLayer);
-  }
-  if (existingBusLayer) {
-    if (enabled) map.removeLayer(existingBusLayer); else existingBusLayer.addTo(map);
-  }
-  for (const m of reformBusStopMarkers) {
-    if (enabled) stopMarkersLayer.addLayer(m); else stopMarkersLayer.removeLayer(m);
-  }
-  for (const m of existingBusStopMarkers) {
-    if (enabled) stopMarkersLayer.removeLayer(m); else stopMarkersLayer.addLayer(m);
-  }
-
-  recomputeCurrentView();
+  applyNetworkState(srlEnabled, enabled);
+  recomputeIsochroneView();
   syncURL(false);
 }
 

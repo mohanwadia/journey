@@ -14,17 +14,6 @@
     <div id="map"></div>
 
     <aside id="panel">
-      <div id="layers-panel" class="panel-block">
-        <label class="toggle-row">
-          <input type="checkbox" id="srl-toggle" checked />
-          <span>Suburban Rail Loop</span>
-        </label>
-        <label class="toggle-row">
-          <input type="checkbox" id="bus-reform-toggle" checked />
-          <span>Bus Reform</span>
-        </label>
-      </div>
-
       <div id="tabs" role="tablist">
         <button id="tab-journey" class="tab-btn active" data-tab="journey" role="tab" aria-selected="true">Journey</button>
         <button id="tab-isochrone" class="tab-btn" data-tab="isochrone" role="tab" aria-selected="false">Isochrone</button>
@@ -37,6 +26,10 @@
             <button id="reset-btn" class="btn-secondary">Reset</button>
             <button id="share-btn" class="btn-secondary hidden">Share</button>
           </div>
+        </div>
+
+        <div id="combo-selector" class="panel-block hidden">
+          <div id="combo-buttons" class="combo-row"></div>
         </div>
 
         <div id="summary" class="panel-block hidden">
@@ -55,6 +48,17 @@
       </div>
 
       <div id="isochrone-panel" class="tab-panel hidden">
+        <div id="layers-panel" class="panel-block">
+          <label class="toggle-row">
+            <input type="checkbox" id="srl-toggle" checked />
+            <span>Suburban Rail Loop</span>
+          </label>
+          <label class="toggle-row">
+            <input type="checkbox" id="bus-reform-toggle" checked />
+            <span>Bus Reform</span>
+          </label>
+        </div>
+
         <div id="iso-instructions" class="panel-block">
           <p id="iso-instruction-text">Click the map to see how far you can travel in <strong>20</strong>, <strong>40</strong>, and <strong>60</strong> minutes.</p>
           <div class="button-row">

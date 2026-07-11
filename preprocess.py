@@ -66,7 +66,7 @@ TRAM_FREQUENCY = 10            # universal tram frequency, same treatment as tra
 TRAM_COLOR = "#91DE56"
 EXIST_BUS_COLOR = "#ff8200"    # existing (non-reform) metro bus network - must match
                                 # RIDE_COLOR_EXIST_BUS in app.js
-EXIST_BUS_DEFAULT_FREQUENCY = 30  # fallback headway (min) for any route missing from
+EXIST_BUS_DEFAULT_FREQUENCY = 300  # fallback headway (min) for any route missing from
                                     # BUS_FREQUENCY_JSON
 
 WGS84 = "EPSG:4326"
@@ -651,7 +651,7 @@ def build_graph(routes, stops, route_stop_sequences):
     return nodes, edges
 
 
-def add_walk_transfer_edges(nodes, edges, stops, max_walk_m=500):
+def add_walk_transfer_edges(nodes, edges, stops, max_walk_m=1000):
     hub_stops = list(stops.items())
     added = 0
     for (sid_a, a), (sid_b, b) in combinations(hub_stops, 2):
