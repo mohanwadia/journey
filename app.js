@@ -11,12 +11,13 @@ const NEAREST_STOP_CANDIDATES = 4;    // don't just take the closest stop — gi
 const NON_RIDE_LINE_COLOR = '#333434';
 const NON_RIDE_LINE_WEIGHT = 5;
 const RIDE_LINE_WEIGHT = 6;
-const RIDE_COLOR_B1 = '#DA291C';
-const RIDE_COLOR_B2 = '#ff8200';
+const RIDE_COLOR_B1 = '#D92B26';
+const RIDE_COLOR_B2 = '#F1B80E';
 const RIDE_COLOR_RAIL = '#0072CE';
 const RIDE_COLOR_DEFAULT = '#ff8200';
 const RIDE_COLOR_SRL = '#008746';
 const RIDE_COLOR_TRAM = '#91DE56';
+const RIDE_COLOR_EXIST_BUS = '#ff8200'; // must match EXIST_BUS_COLOR in preprocess.py
 
 // Muted/duller version of a bright hex color, used for the background route
 // lines shown before the person has clicked anything - blends toward a
@@ -56,6 +57,14 @@ let srlEnabled = true;          // whether Suburban Rail Loop edges/lines are us
 let srlRouteLayer = null;       // the SRL line geometry (toggled on/off the map)
 let srlStopMarkers = [];        // SRL station dot markers (added/removed from stopMarkersLayer)
 
+let busReformEnabled = true;        // true = reform bus network (B1/B2) usable & shown;
+                                     // false = existing metro bus network (EXIST_BUS) instead.
+                                     // The two are mutually exclusive, unlike the SRL on/off toggle.
+let reformBusLayer = null;          // hand-drawn reform bus route lines
+let existingBusLayer = null;        // real GTFS existing bus route lines
+let reformBusStopMarkers = [];      // stop dots that belong only to the reform network
+let existingBusStopMarkers = [];    // stop dots that belong only to the existing network
+
 let currentTab = 'journey';     // 'journey' | 'isochrone'
 let isoLayer = null;            // layered walking-radius circles
 let isoMarker = null;           // marker at the clicked isochrone origin
@@ -85,6 +94,10 @@ Promise.all([
   const srlToggle = document.getElementById('srl-toggle');
   if (srlToggle) srlToggle.checked = srlEnabled;
 
+  busReformEnabled = new URLSearchParams(window.location.search).get('busReform') !== '0';
+  const busReformToggle = document.getElementById('bus-reform-toggle');
+  if (busReformToggle) busReformToggle.checked = busReformEnabled;
+
   buildAdjacency();
   buildStopIndex();
   renderRouteLines(routesGeojson);
@@ -107,13 +120,26 @@ function buildAdjacency() {
   rebuildAdjacency();
 }
 
+function routeCorridor(routeId) {
+  const meta = graph.routes && graph.routes[routeId];
+  return meta ? meta.corridor : null;
+}
+function isReformBusCorridor(c) { return c === 'B1' || c === 'B2'; }
+function isExistingBusCorridor(c) { return c === 'EXIST_BUS'; }
+
 // Rebuilds the routing edge index from scratch, skipping SRL edges when the
-// line is toggled off. Cheap enough to call on every toggle — the graph is
-// small — and simpler than patching a live adjacency map in place.
+// line is toggled off, and skipping whichever bus network (reform vs
+// existing) isn't currently selected. Cheap enough to call on every toggle —
+// the graph is small — and simpler than patching a live adjacency map in place.
 function rebuildAdjacency() {
   baseAdj = new Map();
   for (const e of graph.edges) {
     if (!srlEnabled && e.route === 'RAIL:SRL') continue;
+    if (e.route) {
+      const corridor = routeCorridor(e.route);
+      if (busReformEnabled && isExistingBusCorridor(corridor)) continue;
+      if (!busReformEnabled && isReformBusCorridor(corridor)) continue;
+    }
     if (!baseAdj.has(e.from)) baseAdj.set(e.from, []);
     baseAdj.get(e.from).push(e);
   }
@@ -131,6 +157,8 @@ function buildStopIndex() {
 function renderStopMarkers() {
   stopMarkersLayer = L.layerGroup();
   srlStopMarkers = [];
+  reformBusStopMarkers = [];
+  existingBusStopMarkers = [];
   for (const [stopId, name] of stopNames.entries()) {
     // any hub_in node for this stop gives us its coordinates
     const node = Object.values(graph.nodes).find(n => n.stop_id === stopId && n.type === 'hub_in');
@@ -139,9 +167,25 @@ function renderStopMarkers() {
       radius: 3, weight: 1, color: '#1a1d1f', fillColor: '#f7f6f3', fillOpacity: 1,
     }).bindPopup(name);
 
-    if (stopId.startsWith('SRL_S')) {
+    // Classify by the corridor(s) actually serving this stop, so a stop only
+    // gets hidden with a bus network if EVERY route through it belongs to
+    // that network (an interchange with rail/tram should stay visible).
+    const corridors = new Set();
+    const routesHere = stopRoutes.get(stopId);
+    if (routesHere) for (const r of routesHere) corridors.add(routeCorridor(r));
+    const corridorList = [...corridors];
+    const isReformBusOnly = corridorList.length > 0 && corridorList.every(isReformBusCorridor);
+    const isExistingBusOnly = corridorList.length > 0 && corridorList.every(isExistingBusCorridor);
+
+    if (stopId.startsWith('SRL_S') || corridors.has('SRL')) {
       srlStopMarkers.push(marker);
       if (srlEnabled) stopMarkersLayer.addLayer(marker);
+    } else if (isReformBusOnly) {
+      reformBusStopMarkers.push(marker);
+      if (busReformEnabled) stopMarkersLayer.addLayer(marker);
+    } else if (isExistingBusOnly) {
+      existingBusStopMarkers.push(marker);
+      if (!busReformEnabled) stopMarkersLayer.addLayer(marker);
     } else {
       stopMarkersLayer.addLayer(marker);
     }
@@ -173,6 +217,10 @@ function routeLineStyle(feature) {
     const base = feature.properties.color || RIDE_COLOR_TRAM;
     return { color: dullColor(base), weight: 3.5, opacity: 0.75 };
   }
+  if (corridor === 'EXIST_BUS') {
+    const base = feature.properties.color || RIDE_COLOR_EXIST_BUS;
+    return { color: dullColor(base), weight: 2.5, opacity: 0.6 };
+  }
   const isB1 = corridor === 'B1';
   return {
     color: dullColor(isB1 ? RIDE_COLOR_B1 : RIDE_COLOR_B2),
@@ -182,13 +230,26 @@ function routeLineStyle(feature) {
 }
 
 function renderRouteLines(routesGeojson) {
+  const toggledCorridors = ['SRL', 'B1', 'B2', 'EXIST_BUS'];
   const srlFeatures = routesGeojson.features.filter((f) => f.properties.corridor === 'SRL');
-  const otherFeatures = routesGeojson.features.filter((f) => f.properties.corridor !== 'SRL');
+  const reformBusFeatures = routesGeojson.features.filter((f) => isReformBusCorridor(f.properties.corridor));
+  const existingBusFeatures = routesGeojson.features.filter((f) => isExistingBusCorridor(f.properties.corridor));
+  const otherFeatures = routesGeojson.features.filter((f) => !toggledCorridors.includes(f.properties.corridor));
 
   L.geoJSON({ type: 'FeatureCollection', features: otherFeatures }, {
     interactive: false, // let clicks pass through to the map
     style: routeLineStyle,
   }).addTo(map);
+
+  reformBusLayer = L.geoJSON({ type: 'FeatureCollection', features: reformBusFeatures }, {
+    interactive: false,
+    style: routeLineStyle,
+  });
+  existingBusLayer = L.geoJSON({ type: 'FeatureCollection', features: existingBusFeatures }, {
+    interactive: false,
+    style: routeLineStyle,
+  });
+  if (busReformEnabled) reformBusLayer.addTo(map); else existingBusLayer.addTo(map);
 
   srlRouteLayer = L.geoJSON({ type: 'FeatureCollection', features: srlFeatures }, {
     interactive: false,
@@ -716,6 +777,7 @@ function routeColor(routeName) {
   const corridor = meta ? meta.corridor : null;
   if (corridor === 'B1') return RIDE_COLOR_B1;
   if (corridor === 'B2') return RIDE_COLOR_B2;
+  if (corridor === 'EXIST_BUS') return (meta && meta.color) || RIDE_COLOR_EXIST_BUS;
   if (meta && meta.mode === 'rail') {
     if (routeName === 'RAIL:SRL' || corridor === 'SRL') {
       return (meta && meta.color) || RIDE_COLOR_SRL;
@@ -833,6 +895,7 @@ function buildURL() {
   url.search = '';
   url.searchParams.set('mode', currentTab === 'isochrone' ? 'isochrone' : 'journey');
   if (!srlEnabled) url.searchParams.set('srl', '0');
+  if (!busReformEnabled) url.searchParams.set('busReform', '0');
   if (currentTab === 'journey' && originLatLng && destLatLng) {
     url.searchParams.set('origin', `${originLatLng.lat.toFixed(6)},${originLatLng.lng.toFixed(6)}`);
     url.searchParams.set('dest', `${destLatLng.lat.toFixed(6)},${destLatLng.lng.toFixed(6)}`);
@@ -1039,7 +1102,7 @@ function recomputeCurrentView() {
       document.getElementById('itinerary').classList.add('hidden');
       document.getElementById('empty-state').classList.remove('hidden');
       document.getElementById('instruction-text').textContent =
-        'No route found with the current line selection — try re-enabling the SRL.';
+        'No route found with the current line selection — try re-enabling the SRL or switching bus networks.';
       return;
     }
     renderItinerary(result);
@@ -1071,4 +1134,38 @@ function setSrlEnabled(enabled) {
 const srlToggleEl = document.getElementById('srl-toggle');
 if (srlToggleEl) {
   srlToggleEl.addEventListener('change', (e) => setSrlEnabled(e.target.checked));
+}
+
+// ---------------------------------------------------------------------------
+// Bus Reform toggle
+// ---------------------------------------------------------------------------
+// Unlike the SRL toggle (a simple on/off), this switches between two
+// mutually-exclusive bus networks: the hand-drawn reform network (B1/B2
+// corridors, checked = on) and the existing real-world metro bus network
+// (EXIST_BUS corridor, shown when unchecked).
+
+function setBusReformEnabled(enabled) {
+  busReformEnabled = enabled;
+  rebuildAdjacency();
+
+  if (reformBusLayer) {
+    if (enabled) reformBusLayer.addTo(map); else map.removeLayer(reformBusLayer);
+  }
+  if (existingBusLayer) {
+    if (enabled) map.removeLayer(existingBusLayer); else existingBusLayer.addTo(map);
+  }
+  for (const m of reformBusStopMarkers) {
+    if (enabled) stopMarkersLayer.addLayer(m); else stopMarkersLayer.removeLayer(m);
+  }
+  for (const m of existingBusStopMarkers) {
+    if (enabled) stopMarkersLayer.removeLayer(m); else stopMarkersLayer.addLayer(m);
+  }
+
+  recomputeCurrentView();
+  syncURL(false);
+}
+
+const busReformToggleEl = document.getElementById('bus-reform-toggle');
+if (busReformToggleEl) {
+  busReformToggleEl.addEventListener('change', (e) => setBusReformEnabled(e.target.checked));
 }

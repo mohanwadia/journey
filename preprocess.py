@@ -31,6 +31,11 @@ GTFS_STOPS = f"gtfs/2/google_transit/stops.txt"
 GTFS_TRAM_ROUTES = f"gtfs/3/google_transit/routes.txt"
 GTFS_TRAM_SHAPES = f"gtfs/3/google_transit/shapes.txt"
 GTFS_TRAM_STOPS = f"gtfs/3/google_transit/stops.txt"
+GTFS_BUS_ROUTES = f"gtfs/4/google_transit/routes.txt"   # PTV metro bus feed - the *existing*
+GTFS_BUS_SHAPES = f"gtfs/4/google_transit/shapes.txt"   # real-world network, as opposed to the
+GTFS_BUS_STOPS = f"gtfs/4/google_transit/stops.txt"     # hand-drawn reform network in BUS_GEOJSON
+BUS_FREQUENCY_JSON = f"data/bus_frequency_summary.json" # download from:
+                                                          # https://raw.githubusercontent.com/adambain014/FrequencyFinder/main/route_jsons/summary.json
 SRL_GEOJSON = f"data/srl.geojson"
 
 OUTPUT_GRAPH = f"data/graph.json"
@@ -59,6 +64,10 @@ SRL_FREQUENCY = 5
 TRAM_SPEED_KMH = 20.0          # universal tram speed (avg incl. stops/dwell)
 TRAM_FREQUENCY = 10            # universal tram frequency, same treatment as trains
 TRAM_COLOR = "#91DE56"
+EXIST_BUS_COLOR = "#5C6672"    # existing (non-reform) metro bus network - must match
+                                # RIDE_COLOR_EXIST_BUS in app.js
+EXIST_BUS_DEFAULT_FREQUENCY = 30  # fallback headway (min) for any route missing from
+                                    # BUS_FREQUENCY_JSON
 
 WGS84 = "EPSG:4326"
 METRIC = "EPSG:28355"  # GDA94 / MGA zone 55 - accurate for Melbourne
@@ -112,17 +121,91 @@ def gtfs_route_code(route_id):
     return core.split("-")[-1]
 
 
+def _parse_frequency_value(v):
+    """Coerces a frequency_summary value to a float, or None if it isn't one.
+    The summary.json has a handful of non-numeric entries in practice: null,
+    numbers quoted as strings (e.g. "60"), and the sentinel string
+    'No Next Service' for routes with no timetabled daytime trip that day."""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str):
+        try:
+            return float(v)
+        except ValueError:
+            return None
+    return None
+
+
+def load_bus_frequencies(json_path):
+    """Loads the FrequencyFinder summary.json and returns {route_number: daytime
+    Monday headway in minutes}. Routes with no usable Monday daytime figure
+    (missing, null, or the 'No Next Service' sentinel) are simply omitted -
+    callers should fall back to a default."""
+    data = json.load(open(json_path, encoding="utf-8"))
+    freqs = {}
+    for info in data.values():
+        route_number = info.get("route_number")
+        if not route_number:
+            continue
+        monday = next(
+            (s for s in info.get("frequency_summary", []) if s.get("day") == "Monday"),
+            None,
+        )
+        if not monday:
+            continue
+        value = _parse_frequency_value(monday.get("daytime"))
+        if value:
+            freqs[route_number] = value
+    return freqs
+
+
 def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt, mode="rail",
                             corridor="RAIL", id_prefix="RAIL",
                             speed_kmh=TRAIN_SPEED_KMH, frequency_min=TRAIN_FREQUENCY,
-                            color=None, stop_location_types=("1",)):
-    # 1. which route codes count as real train lines (skip rail-replacement buses)
+                            default_frequency_min=None,
+                            color=None, stop_location_types=("1",),
+                            route_key_field="route_id",
+                            route_types=None,
+                            skip_route_short_names=("Replacement Bus", "City Circle",
+                                                     "Flemington Racecourse", "Stony Point")):
+    """Generic real-GTFS-shape route loader, used for trains, trams, and (with
+    route_key_field="route_short_name") the existing metro bus network.
+
+    frequency_min can be a single number (applied to every route) or a dict of
+    {route_number: minutes} - e.g. from load_bus_frequencies() - in which case
+    default_frequency_min is used for any route the dict doesn't cover.
+
+    route_key_field picks how each GTFS route is matched to its shape:
+    - "route_id": derive a short code from route_id via gtfs_route_code()
+      (works for VIC train/tram feeds, where shape_ids embed that same code)
+    - "route_short_name": use the route number itself as the key (for the bus
+      feed, whose shape_ids embed the route number rather than a letter code)
+
+    route_types, if given, restricts to GTFS route_type values in that set/tuple.
+    This matters for the statewide bus feed: it mixes metro routes (route_type
+    "3", route_short_name uniquely identifies a route, e.g. "200") with V/Line
+    regional coach routes (route_type "701", route_short_name is NOT unique -
+    e.g. short_name "45" is reused by seven unrelated regional services, each
+    disambiguated only by a letter-prefixed code like "L45"/"G45"/"B05" that's
+    embedded in route_id/shape_id, not in route_short_name at all). Loading
+    those under route_key_field="route_short_name" without this filter causes
+    routes to silently overwrite each other and shapes to mismatch. Passing
+    route_types=("3",) restricts to the metro network, where this is a non-issue.
+    """
+    # 1. which routes count as real lines to load (skip rail-replacement buses etc)
     train_routes = {}
     with open(routes_txt, encoding="utf-8-sig") as fh:
         for row in csv.DictReader(fh):
-            if row["route_short_name"] in ["Replacement Bus", "City Circle", "Flemington Racecourse", "Stony Point"]:
+            if row["route_short_name"] in skip_route_short_names:
                 continue
-            code = gtfs_route_code(row["route_id"])
+            if route_types is not None and row["route_type"] not in route_types:
+                continue
+            if route_key_field == "route_short_name":
+                code = row["route_short_name"]
+            else:
+                code = gtfs_route_code(row["route_id"])
             train_routes[code] = {
                 "route_id": row["route_id"],
                 "short_name": row["route_long_name"],
@@ -181,30 +264,46 @@ def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt, mode="rail",
             })
 
     # 5. build route dicts with metric LineStrings
+    is_freq_lookup = isinstance(frequency_min, dict)
+    missing_freq_routes = []
     routes = {}
     for code, (length_m, coords_latlon) in shapes_by_code.items():
         meta = train_routes[code]
         line_wgs = LineString([(lon, lat) for lat, lon in coords_latlon])
         line_m = shapely_transform(to_metric, line_wgs)
         route_id = f"{id_prefix}:{code}"
-        if mode == "tram":
+        if mode in ("tram", "bus"):
             display_label = f"{meta['route_number']} {meta['short_name']}".strip()
         else:
             display_label = meta["short_name"]
+        if is_freq_lookup:
+            freq = frequency_min.get(meta["route_number"])
+            if freq is None:
+                freq = default_frequency_min
+                missing_freq_routes.append(meta["route_number"])
+        else:
+            freq = frequency_min
         routes[route_id] = {
             "route_id": route_id,
             "corridor": corridor,
             "mode": mode,
-            "frequency_min": frequency_min,
+            "frequency_min": freq,
             "speed_kmh": speed_kmh,
             "line_m": line_m,
             "line_wgs_coords": list(line_wgs.coords),
             "gtfs_code": code,
             "short_name": meta["short_name"],
             "display_label": display_label,
+            "use_real_stops": True,  # real GTFS stops only, never 400m-resampled
         }
         if color:
             routes[route_id]["color"] = color
+
+    if missing_freq_routes:
+        uniq = sorted(set(missing_freq_routes))
+        shown = ", ".join(uniq[:15]) + ("..." if len(uniq) > 15 else "")
+        print(f"  (no frequency match for {len(uniq)} routes, using default "
+              f"{default_frequency_min} min: {shown})")
 
     # 6. snap real stations onto every rail line they actually sit on
     #    (a station near several lines -> naturally becomes a shared/interchange stop)
@@ -404,15 +503,17 @@ def build_stops(routes, interchanges, real_stops_by_route):
     for ic in interchanges:
         px, py = ic["point"]
         existing = nearest_existing_stop(px, py, SNAP_TOLERANCE_M)
-        # Geometric interchanges only ever add BUS routes to a stop. A
-        # rail/tram route's stops come exclusively from its own real GTFS
-        # stop membership (seeded in step 1, and forced again in step 3) -
-        # never from merely crossing near a stop geometrically. Filtering
-        # this here (rather than just skipping the union above) keeps the
-        # per-route "forced" stop list below in sync with `stop.routes`,
-        # so we never end up forcing a route through a stop node that was
-        # never actually created for it.
-        ic["routes"] = {r for r in ic["routes"] if routes[r].get("mode") not in ("rail", "tram")}
+        # Geometric interchanges only ever add resampled (reform bus) routes
+        # to a stop. A real-stop route (train/tram/SRL/existing bus) gets its
+        # stops exclusively from its own real GTFS stop membership (seeded in
+        # step 1, and forced again in step 3) - never from merely crossing
+        # near a stop geometrically. Filtering this here (rather than just
+        # skipping the union above) keeps the per-route "forced" stop list
+        # below in sync with `stop.routes`, so we never end up forcing a
+        # route through a stop node that was never actually created for it.
+        ic["routes"] = {r for r in ic["routes"]
+                         if not routes[r].get("use_real_stops",
+                                               routes[r].get("mode") in ("rail", "tram"))}
         if existing:
             ic["stop_id"] = existing
             if ic["routes"]:
@@ -440,20 +541,25 @@ def build_stops(routes, interchanges, real_stops_by_route):
     for route_id, route in routes.items():
         line = route["line_m"]
         total = line.length
-        is_rail = route.get("mode") in ("rail", "tram")
+        # Routes whose stops come from real GTFS data (trains, trams, SRL, and
+        # the existing/non-reform bus network) never get 400m-resampled stops -
+        # only the hand-drawn reform bus network (B1/B2) does. Falls back to
+        # the old rail/tram-only check for any route dict that predates the
+        # explicit flag.
+        use_real_stops = route.get("use_real_stops", route.get("mode") in ("rail", "tram"))
 
         forced = []
         for ic in interchanges:
             if route_id in ic["routes"]:
                 forced.append((ic["dist_on_route"][route_id], ic["stop_id"]))
 
-        if is_rail:
+        if use_real_stops:
             for dist, sid, x, y, name in real_stops_by_route.get(route_id, []):
                 forced.append((dist, sid))
         forced = sorted(set(forced), key=lambda t: t[0])
         forced_dists = [f[0] for f in forced]
 
-        if is_rail:
+        if use_real_stops:
             kept_regular = []
         else:
             n_regular = max(1, round(total / STOP_SPACING_M))
@@ -615,6 +721,28 @@ def main():
     train_routes.update(tram_routes)
     real_stops_by_route.update(tram_real_stops)
 
+    bus_freq_by_route_number = load_bus_frequencies(BUS_FREQUENCY_JSON)
+    print(f"Loaded frequency data for {len(bus_freq_by_route_number)} existing bus routes")
+    existing_bus_routes, existing_bus_real_stops = load_gtfs_train_routes(
+        GTFS_BUS_ROUTES, GTFS_BUS_SHAPES, GTFS_BUS_STOPS,
+        mode="bus", corridor="EXIST_BUS", id_prefix="EBUS",
+        speed_kmh=BUS_SPEED_KMH,
+        frequency_min=bus_freq_by_route_number,
+        default_frequency_min=EXIST_BUS_DEFAULT_FREQUENCY,
+        color=EXIST_BUS_COLOR,
+        stop_location_types=("", "0"),
+        route_key_field="route_short_name",
+        route_types=("3",),  # metro bus only - excludes route_type 701 (V/Line
+                              # regional coaches), whose route_short_name isn't
+                              # unique (e.g. "45" is reused by 7 different towns)
+        skip_route_short_names=(),
+    )
+    print(f"Loaded {len(existing_bus_routes)} existing bus routes from GTFS")
+    total_bus_stops = len(set(sid for entries in existing_bus_real_stops.values() for _, sid, *_ in entries))
+    print(f"Matched {total_bus_stops} distinct real bus stops across those lines")
+    train_routes.update(existing_bus_routes)
+    real_stops_by_route.update(existing_bus_real_stops)
+
     routes = {**bus_routes, **train_routes}
 
     interchanges = find_interchanges(routes)
@@ -644,7 +772,8 @@ def main():
             "train_frequency": TRAIN_FREQUENCY,
             "B1_frequency": B1_FREQUENCY,
             "B2_frequency": B2_FREQUENCY,
-            "tram_frequency": TRAM_FREQUENCY
+            "tram_frequency": TRAM_FREQUENCY,
+            "exist_bus_default_frequency": EXIST_BUS_DEFAULT_FREQUENCY
         },
         "routes": {rid: {"frequency_min": r["frequency_min"], "corridor": r["corridor"], "mode": r["mode"],
                           **({"color": r["color"]} if "color" in r else {}),
