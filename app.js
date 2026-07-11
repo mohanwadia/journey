@@ -17,7 +17,7 @@ const RIDE_COLOR_RAIL = '#0072CE';
 const RIDE_COLOR_DEFAULT = '#ff8200';
 const RIDE_COLOR_SRL = '#008746';
 const RIDE_COLOR_TRAM = '#91DE56';
-const RIDE_COLOR_EXIST_BUS = '#ffaf7a'; // must match EXIST_BUS_COLOR in preprocess.py
+const RIDE_COLOR_EXIST_BUS = '#ff8200'; // must match EXIST_BUS_COLOR in preprocess.py
 
 // Muted/duller version of a bright hex color, used for the background route
 // lines shown before the person has clicked anything - blends toward a
