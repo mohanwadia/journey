@@ -1209,7 +1209,7 @@ function journeyShareText() {
 
 // Fixed share text for the Isochrone tab.
 function isochroneShareText() {
-  return "I'll be able to travel so much faster when Melbourne has SRL and better buses 🤯 mohanwadia.com/srl";
+  return "Check out how much time you'll save once Melbourne has SRL and better buses 🤯 mohanwadia.com/srl";
 }
 
 // Generic share text used when nothing has been clicked on the map yet
