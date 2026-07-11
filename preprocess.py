@@ -651,7 +651,7 @@ def build_graph(routes, stops, route_stop_sequences):
     return nodes, edges
 
 
-def add_walk_transfer_edges(nodes, edges, stops, max_walk_m=1000):
+def add_walk_transfer_edges(nodes, edges, stops, max_walk_m=500):
     hub_stops = list(stops.items())
     added = 0
     for (sid_a, a), (sid_b, b) in combinations(hub_stops, 2):

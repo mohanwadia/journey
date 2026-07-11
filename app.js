@@ -928,18 +928,25 @@ function visibleJourneyCombos() {
   const srl = comboDisplayMin('srl');
   const both = comboDisplayMin('both');
 
-  let hideBoth = same(srl, both) || same(busReform, both);
-  let hideSrl = false;
-  if (same(current, srl) && same(busReform, both)) {
-    hideSrl = true;
-    hideBoth = true;
-  }
+  const hideBoth = same(srl, both) || same(busReform, both);
+  const hideSrl = same(current, srl);
 
   return JOURNEY_COMBOS.filter((c) => {
     if (c.key === 'both' && hideBoth) return false;
     if (c.key === 'srl' && hideSrl) return false;
     return true;
   });
+}
+
+// Picks the quickest visible combo that actually has a route (falling back
+// to the first visible combo if none do), used as the default selection.
+function fastestJourneyCombo() {
+  const withResults = visibleJourneyCombos().filter((c) => journeyResults[c.key]);
+  if (withResults.length === 0) {
+    return (visibleJourneyCombos()[0] || JOURNEY_COMBOS[0]).key;
+  }
+  withResults.sort((a, b) => comboDisplayMin(a.key) - comboDisplayMin(b.key));
+  return withResults[0].key;
 }
 
 // Builds the four-button row showing each combo's total time, highlighting
@@ -950,7 +957,15 @@ function renderComboSelector() {
   if (!container || !row) return;
 
   row.innerHTML = '';
-  for (const combo of visibleJourneyCombos()) {
+  const sorted = [...visibleJourneyCombos()].sort((a, b) => {
+    const ta = comboDisplayMin(a.key);
+    const tb = comboDisplayMin(b.key);
+    if (ta === null && tb === null) return 0;
+    if (ta === null) return 1;  // no route sorts last
+    if (tb === null) return -1;
+    return ta - tb;             // fastest first
+  });
+  for (const combo of sorted) {
     const result = journeyResults[combo.key];
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1031,14 +1046,24 @@ function buildURL() {
   const url = new URL(window.location.href);
   url.search = '';
   url.searchParams.set('mode', currentTab === 'isochrone' ? 'isochrone' : 'journey');
-  if (!srlEnabled) url.searchParams.set('srl', '0');
-  if (!busReformEnabled) url.searchParams.set('busReform', '0');
-  if (currentTab === 'journey' && originLatLng && destLatLng) {
-    url.searchParams.set('origin', `${originLatLng.lat.toFixed(6)},${originLatLng.lng.toFixed(6)}`);
-    url.searchParams.set('dest', `${destLatLng.lat.toFixed(6)},${destLatLng.lng.toFixed(6)}`);
-  } else if (currentTab === 'isochrone' && isoOriginLatLng) {
-    url.searchParams.set('point', `${isoOriginLatLng.lat.toFixed(6)},${isoOriginLatLng.lng.toFixed(6)}`);
+
+  if (currentTab === 'journey') {
+    // Only encode the network combo alongside an actual trip — with no
+    // pins placed there's nothing to reopen, so the URL stays bare.
+    if (originLatLng && destLatLng) {
+      if (!srlEnabled) url.searchParams.set('srl', '0');
+      if (!busReformEnabled) url.searchParams.set('busReform', '0');
+      url.searchParams.set('origin', `${originLatLng.lat.toFixed(6)},${originLatLng.lng.toFixed(6)}`);
+      url.searchParams.set('dest', `${destLatLng.lat.toFixed(6)},${destLatLng.lng.toFixed(6)}`);
+    }
+  } else if (currentTab === 'isochrone') {
+    if (!srlEnabled) url.searchParams.set('srl', '0');
+    if (!busReformEnabled) url.searchParams.set('busReform', '0');
+    if (isoOriginLatLng) {
+      url.searchParams.set('point', `${isoOriginLatLng.lat.toFixed(6)},${isoOriginLatLng.lng.toFixed(6)}`);
+    }
   }
+
   return url;
 }
 
@@ -1085,14 +1110,13 @@ function loadFromURL() {
     }
 
     // The URL's srl/busReform params (if any) pick which combo to open with;
-    // otherwise default to "Current", falling back to the first combo that
-    // actually has a route.
+    // otherwise default to the fastest combo that actually has a route.
     const requestedSrl = params.get('srl') !== '0';
     const requestedBusReform = params.get('busReform') !== '0';
     const requestedCombo = JOURNEY_COMBOS.find((c) => c.srl === requestedSrl && c.busReform === requestedBusReform);
     const comboToSelect = (requestedCombo && journeyResults[requestedCombo.key])
       ? requestedCombo.key
-      : (journeyResults.current ? 'current' : JOURNEY_COMBOS.find((c) => journeyResults[c.key]).key);
+      : fastestJourneyCombo();
 
     selectJourneyCombo(comboToSelect);
     document.getElementById('instruction-text').innerHTML = 'Click <strong>Reset</strong> to plan another trip.';
@@ -1162,12 +1186,8 @@ function onJourneyClick(e) {
     return;
   }
 
-  // Keep showing whichever combo was already selected, if it still has a
-  // route; otherwise fall back to the first combo that does.
-  const comboToSelect = journeyResults[journeyCombo]
-    ? journeyCombo
-    : JOURNEY_COMBOS.find((c) => journeyResults[c.key]).key;
-  selectJourneyCombo(comboToSelect);
+  // Always default to the fastest combo.
+  selectJourneyCombo(fastestJourneyCombo());
 
   syncURL(false);
   document.getElementById('instruction-text').innerHTML = 'Click to move your <strong>destination</strong>, or Reset to change your origin.';
