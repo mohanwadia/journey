@@ -931,6 +931,7 @@ function comboDisplayMin(key) {
 
 // Filters JOURNEY_COMBOS down to the ones worth showing:
 // - hide any combo with no route at all (nothing to show for that tab)
+// - hide "Bus Reform" if it matches "Current" (nothing new to show)
 // - hide "Both" if it matches "SRL" or "Bus Reform" (nothing new to show)
 // - hide "SRL" (and therefore "Both") if "Current" == "SRL" AND
 //   "Bus Reform" == "Both" — i.e. adding SRL alone changes nothing, and
@@ -944,11 +945,13 @@ function visibleJourneyCombos() {
   const srl = comboDisplayMin('srl');
   const both = comboDisplayMin('both');
 
+  const hideBusReform = same(current, busReform);
   const hideBoth = same(srl, both) || same(busReform, both);
   const hideSrl = same(current, srl);
 
   return JOURNEY_COMBOS.filter((c) => {
     if (!journeyResults[c.key]) return false;
+    if (c.key === 'busReform' && hideBusReform) return false;
     if (c.key === 'both' && hideBoth) return false;
     if (c.key === 'srl' && hideSrl) return false;
     return true;
@@ -1100,7 +1103,11 @@ function syncURL(push) {
   }
 
   const shareBtn = document.getElementById('share-btn');
-  if (shareBtn) shareBtn.classList.toggle('hidden', !(originLatLng && destLatLng));
+  if (shareBtn) {
+    const hasJourney = currentTab === 'journey' && originLatLng && destLatLng;
+    const hasIso = currentTab === 'isochrone' && isoOriginLatLng;
+    shareBtn.classList.toggle('hidden', !(hasJourney || hasIso));
+  }
 }
 
 // Reads the current URL (path + query) on load or on popstate and applies
@@ -1165,9 +1172,61 @@ function loadFromURL() {
 
 window.addEventListener('popstate', loadFromURL);
 
-function copyShareLink() {
+// Below this width (covers phones and tablets) we prefer the OS share
+// sheet over copying a link, since that's the native way to share text
+// on those devices.
+function isMobileOrTablet() {
+  return window.innerWidth <= 1024;
+}
+
+// Builds the viral share text for the Journey tab. The headline number is
+// the gap between the fastest and slowest of the four network combos
+// (Current / Bus Reform / SRL / Both) that actually have a route. If the
+// fastest combo is "Current" itself, there's no time saved to brag about,
+// so a different message is used. Otherwise the message calls out just
+// SRL, just Bus Reform, or both — whichever the fastest combo actually
+// used.
+function journeyShareText() {
+  const withResults = JOURNEY_COMBOS
+    .filter((c) => journeyResults[c.key])
+    .map((c) => ({ ...c, time: comboDisplayMin(c.key) }));
+  if (withResults.length === 0) return null;
+
+  let fastest = withResults[0];
+  let slowest = withResults[0];
+  for (const c of withResults) {
+    if (c.time < fastest.time) fastest = c;
+    if (c.time > slowest.time) slowest = c;
+  }
+
+  if (fastest.key === 'current') {
+    return 'I just checked out my commute when Melbourne has SRL and better buses 🤯mohanwadia.com/srl';
+  }
+
+  const x = slowest.time - fastest.time;
+  let mention;
+  if (fastest.key === 'srl') mention = 'SRL';
+  else if (fastest.key === 'busReform') mention = 'better buses';
+  else mention = 'SRL and better buses'; // 'both'
+
+  return `I'll save ${x} minutes on my commute when Melbourne has ${mention}🤯www.mohanwadia.com/srl`;
+}
+
+// Fixed share text for the Isochrone tab.
+function isochroneShareText() {
+  return "I'll be able to travel so much faster when Melbourne has SRL and better buses 🤯mohanwadia.com/srl";
+}
+
+function shareOrCopyLink() {
+  const shareBtn = document.getElementById('share-btn');
+  const text = currentTab === 'isochrone' ? isochroneShareText() : journeyShareText();
+
+  if (isMobileOrTablet() && navigator.share && text) {
+    navigator.share({ text }).catch(() => {});
+    return;
+  }
+
   navigator.clipboard.writeText(window.location.href).then(() => {
-    const shareBtn = document.getElementById('share-btn');
     if (!shareBtn) return;
     const original = shareBtn.textContent;
     shareBtn.textContent = 'Link copied!';
@@ -1259,7 +1318,7 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   syncURL(false);
 });
 
-document.getElementById('share-btn').addEventListener('click', copyShareLink);
+document.getElementById('share-btn').addEventListener('click', shareOrCopyLink);
 
 // ---------------------------------------------------------------------------
 // Tabs
