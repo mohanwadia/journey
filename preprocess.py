@@ -24,7 +24,7 @@ from pyproj import Transformer
 from shapely.geometry import LineString, Point
 from shapely.ops import transform as shapely_transform
 
-BUS_GEOJSON = f"data/routes.geojson"
+BUS_GEOJSON = f"data/gis.geojson"
 GTFS_ROUTES = f"gtfs/2/google_transit/routes.txt"
 GTFS_SHAPES = f"gtfs/2/google_transit/shapes.txt"
 GTFS_STOPS = f"gtfs/2/google_transit/stops.txt"
@@ -120,7 +120,7 @@ def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt, mode="rail",
     train_routes = {}
     with open(routes_txt, encoding="utf-8-sig") as fh:
         for row in csv.DictReader(fh):
-            if row["route_short_name"] == "Replacement Bus":
+            if row["route_short_name"] in ["Replacement Bus", "City Circle", "Flemington Racecourse", "Stony Point"]:
                 continue
             code = gtfs_route_code(row["route_id"])
             train_routes[code] = {
@@ -217,6 +217,9 @@ def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt, mode="rail",
     for rid, route in routes.items():
         line = route["line_m"]
         for st, pt in station_pts_m:
+            if route["route_id"] in ["RAIL:PKM", "RAIL:CBE"]:
+                if st["name"] in ["Hawksburn Railway Station", "Toorak Railway Station", "Armadale Railway Station"]:
+                    continue
             d = line.distance(pt)
             if d <= STATION_SNAP_TOLERANCE_M:
                 dist_on_route = line.project(pt)

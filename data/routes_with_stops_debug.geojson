@@ -398,8 +398,7 @@
      "RAIL:GWY",
      "RAIL:HBE",
      "RAIL:LIL",
-     "RAIL:MDD",
-     "RAIL:RCE"
+     "RAIL:MDD"
     ],
     "name": "Southern Cross Railway Station"
    }
@@ -427,7 +426,6 @@
      "RAIL:LIL",
      "RAIL:MDD",
      "RAIL:PKM",
-     "RAIL:RCE",
      "RAIL:SHM",
      "RAIL:UFD"
     ],
@@ -1104,66 +1102,6 @@
    "geometry": {
     "type": "Point",
     "coordinates": [
-     145.01932554,
-     -37.85645238000001
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:ARM",
-    "is_interchange": true,
-    "routes": [
-     "RAIL:CBE",
-     "RAIL:FKN",
-     "RAIL:PKM"
-    ],
-    "name": "Armadale Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.01390858,
-     -37.85077380999999
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:TOR",
-    "is_interchange": true,
-    "routes": [
-     "RAIL:CBE",
-     "RAIL:FKN",
-     "RAIL:PKM"
-    ],
-    "name": "Toorak Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.00190352,
-     -37.84458682999999
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:HKN",
-    "is_interchange": true,
-    "routes": [
-     "RAIL:CBE",
-     "RAIL:FKN",
-     "RAIL:PKM"
-    ],
-    "name": "Hawksburn Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
      144.97279042000002,
      -37.83331102999999
     ]
@@ -1211,7 +1149,6 @@
     "is_interchange": true,
     "routes": [
      "RAIL:CGB",
-     "RAIL:RCE",
      "RAIL:UFD",
      "RAIL:WIL"
     ],
@@ -1229,10 +1166,9 @@
    },
    "properties": {
     "stop_id": "vic:rail:KEN",
-    "is_interchange": true,
+    "is_interchange": false,
     "routes": [
-     "RAIL:CGB",
-     "RAIL:RCE"
+     "RAIL:CGB"
     ],
     "name": "Kensington Railway Station"
    }
@@ -1248,10 +1184,9 @@
    },
    "properties": {
     "stop_id": "vic:rail:NKT",
-    "is_interchange": true,
+    "is_interchange": false,
     "routes": [
-     "RAIL:CGB",
-     "RAIL:RCE"
+     "RAIL:CGB"
     ],
     "name": "Newmarket Railway Station"
    }
@@ -1501,10 +1436,9 @@
    },
    "properties": {
     "stop_id": "vic:rail:FKN",
-    "is_interchange": true,
+    "is_interchange": false,
     "routes": [
-     "RAIL:FKN",
-     "RAIL:STY"
+     "RAIL:FKN"
     ],
     "name": "Frankston Railway Station"
    }
@@ -1851,6 +1785,60 @@
      "RAIL:FKN"
     ],
     "name": "Glen Huntly Railway Station "
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     145.01932554,
+     -37.85645238000001
+    ]
+   },
+   "properties": {
+    "stop_id": "vic:rail:ARM",
+    "is_interchange": false,
+    "routes": [
+     "RAIL:FKN"
+    ],
+    "name": "Armadale Railway Station"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     145.01390858,
+     -37.85077380999999
+    ]
+   },
+   "properties": {
+    "stop_id": "vic:rail:TOR",
+    "is_interchange": false,
+    "routes": [
+     "RAIL:FKN"
+    ],
+    "name": "Toorak Railway Station"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     145.00190352,
+     -37.84458682999999
+    ]
+   },
+   "properties": {
+    "stop_id": "vic:rail:HKN",
+    "is_interchange": false,
+    "routes": [
+     "RAIL:FKN"
+    ],
+    "name": "Hawksburn Railway Station"
    }
   },
   {
@@ -3053,24 +3041,6 @@
    "geometry": {
     "type": "Point",
     "coordinates": [
-     144.90757709,
-     -37.78721072999999
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:RCE",
-    "is_interchange": false,
-    "routes": [
-     "RAIL:RCE"
-    ],
-    "name": "Flemington Racecourse Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
      144.98985992,
      -37.849518480000015
     ]
@@ -3262,168 +3232,6 @@
      "RAIL:SHM"
     ],
     "name": "Sandringham Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.22183746,
-     -38.374234539999996
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:STY",
-    "is_interchange": false,
-    "routes": [
-     "RAIL:STY"
-    ],
-    "name": "Stony Point Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.20404332,
-     -38.366123380000005
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:CPT",
-    "is_interchange": false,
-    "routes": [
-     "RAIL:STY"
-    ],
-    "name": "Crib Point Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.18960249,
-     -38.35403334
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:MRO",
-    "is_interchange": false,
-    "routes": [
-     "RAIL:STY"
-    ],
-    "name": "Morradoo Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.17802653,
-     -38.337390320000004
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:BIT",
-    "is_interchange": false,
-    "routes": [
-     "RAIL:STY"
-    ],
-    "name": "Bittern Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.18597988,
-     -38.305658529999995
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:HST",
-    "is_interchange": false,
-    "routes": [
-     "RAIL:STY"
-    ],
-    "name": "Hastings Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.18640071,
-     -38.25981500000001
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:TAB",
-    "is_interchange": false,
-    "routes": [
-     "RAIL:STY"
-    ],
-    "name": "Tyabb Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.17624492,
-     -38.22534196
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:SVE",
-    "is_interchange": false,
-    "routes": [
-     "RAIL:STY"
-    ],
-    "name": "Somerville Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.16052609,
-     -38.19404305999999
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:BXR",
-    "is_interchange": false,
-    "routes": [
-     "RAIL:STY"
-    ],
-    "name": "Baxter Railway Station"
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.13953396,
-     -38.15203399999999
-    ]
-   },
-   "properties": {
-    "stop_id": "vic:rail:LWA",
-    "is_interchange": false,
-    "routes": [
-     "RAIL:STY"
-    ],
-    "name": "Leawarra Railway Station"
    }
   },
   {
@@ -38499,30 +38307,12 @@
    "geometry": {
     "type": "Point",
     "coordinates": [
-     145.12530109967983,
-     -38.146292687865824
-    ]
-   },
-   "properties": {
-    "stop_id": "IC209",
-    "is_interchange": true,
-    "routes": [
-     "Dandenong - Frankston"
-    ],
-    "name": null
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
      145.13033592682467,
      -38.11047169946048
     ]
    },
    "properties": {
-    "stop_id": "IC210",
+    "stop_id": "IC209",
     "is_interchange": true,
     "routes": [
      "Seaford - Officer",
@@ -38541,7 +38331,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC211",
+    "stop_id": "IC210",
     "is_interchange": true,
     "routes": [
      "Carrum - Cardinia",
@@ -38560,7 +38350,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC212",
+    "stop_id": "IC211",
     "is_interchange": true,
     "routes": [
      "Officer - Nar Nar Goon",
@@ -38580,7 +38370,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC213",
+    "stop_id": "IC212",
     "is_interchange": true,
     "routes": [
      "Clyde - Berwick",
@@ -38599,7 +38389,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC214",
+    "stop_id": "IC213",
     "is_interchange": true,
     "routes": [
      "Hampton Park - Officer",
@@ -38620,7 +38410,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC215",
+    "stop_id": "IC214",
     "is_interchange": true,
     "routes": [
      "Devon Meadows - Clyde",
@@ -38639,7 +38429,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC216",
+    "stop_id": "IC215",
     "is_interchange": true,
     "routes": [
      "Cranbourne - Berwick",
@@ -38658,7 +38448,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC217",
+    "stop_id": "IC216",
     "is_interchange": true,
     "routes": [
      "Cranbourne - Berwick",
@@ -38677,7 +38467,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC218",
+    "stop_id": "IC217",
     "is_interchange": true,
     "routes": [
      "Clyde",
@@ -38696,7 +38486,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC219",
+    "stop_id": "IC218",
     "is_interchange": true,
     "routes": [
      "Seaford - Officer",
@@ -38715,7 +38505,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC220",
+    "stop_id": "IC219",
     "is_interchange": true,
     "routes": [
      "Seaford - Officer",
@@ -38734,7 +38524,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC221",
+    "stop_id": "IC220",
     "is_interchange": true,
     "routes": [
      "Carrum - Cardinia",
@@ -38753,7 +38543,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC222",
+    "stop_id": "IC221",
     "is_interchange": true,
     "routes": [
      "Carrum - Cardinia",
@@ -38772,7 +38562,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC223",
+    "stop_id": "IC222",
     "is_interchange": true,
     "routes": [
      "Carrum - Cardinia",
@@ -38791,7 +38581,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC224",
+    "stop_id": "IC223",
     "is_interchange": true,
     "routes": [
      "Carrum - Cardinia",
@@ -38811,7 +38601,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC225",
+    "stop_id": "IC224",
     "is_interchange": true,
     "routes": [
      "Carrum - Cardinia",
@@ -38830,7 +38620,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC226",
+    "stop_id": "IC225",
     "is_interchange": true,
     "routes": [
      "Carrum - Cardinia",
@@ -38849,7 +38639,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC227",
+    "stop_id": "IC226",
     "is_interchange": true,
     "routes": [
      "Carrum - Cardinia",
@@ -38868,7 +38658,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC228",
+    "stop_id": "IC227",
     "is_interchange": true,
     "routes": [
      "Carrum - Cardinia",
@@ -38887,7 +38677,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC229",
+    "stop_id": "IC228",
     "is_interchange": true,
     "routes": [
      "Carrum - Cardinia"
@@ -38905,7 +38695,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC230",
+    "stop_id": "IC229",
     "is_interchange": true,
     "routes": [
      "Carrum - Cardinia",
@@ -38924,7 +38714,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC231",
+    "stop_id": "IC230",
     "is_interchange": true,
     "routes": [
      "Chelsea - City",
@@ -38943,7 +38733,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC232",
+    "stop_id": "IC231",
     "is_interchange": true,
     "routes": [
      "Chelsea - City",
@@ -38963,7 +38753,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC233",
+    "stop_id": "IC232",
     "is_interchange": true,
     "routes": [
      "Chelsea - City",
@@ -38983,7 +38773,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC234",
+    "stop_id": "IC233",
     "is_interchange": true,
     "routes": [
      "Chelsea - City",
@@ -39002,7 +38792,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC235",
+    "stop_id": "IC234",
     "is_interchange": true,
     "routes": [
      "Box Hill - Ringwood",
@@ -39021,7 +38811,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC236",
+    "stop_id": "IC235",
     "is_interchange": true,
     "routes": [
      "Chelsea - City",
@@ -39040,7 +38830,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC237",
+    "stop_id": "IC236",
     "is_interchange": true,
     "routes": [
      "Chelsea - City",
@@ -39060,7 +38850,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC238",
+    "stop_id": "IC237",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines",
@@ -39079,7 +38869,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC239",
+    "stop_id": "IC238",
     "is_interchange": true,
     "routes": [
      "Chelsea - City",
@@ -39098,7 +38888,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC240",
+    "stop_id": "IC239",
     "is_interchange": true,
     "routes": [
      "Chelsea - City",
@@ -39118,7 +38908,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC241",
+    "stop_id": "IC240",
     "is_interchange": true,
     "routes": [
      "Burwood - Mitcham",
@@ -39137,7 +38927,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC242",
+    "stop_id": "IC241",
     "is_interchange": true,
     "routes": [
      "Chelsea - City"
@@ -39155,7 +38945,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC243",
+    "stop_id": "IC242",
     "is_interchange": true,
     "routes": [
      "Chelsea - City"
@@ -39173,7 +38963,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC244",
+    "stop_id": "IC243",
     "is_interchange": true,
     "routes": [
      "Chelsea - City"
@@ -39191,7 +38981,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC245",
+    "stop_id": "IC244",
     "is_interchange": true,
     "routes": [
      "Chelsea - City"
@@ -39209,7 +38999,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC246",
+    "stop_id": "IC245",
     "is_interchange": true,
     "routes": [
      "Chelsea - City"
@@ -39227,7 +39017,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC247",
+    "stop_id": "IC246",
     "is_interchange": true,
     "routes": [
      "Glen Iris - Moorabin",
@@ -39246,7 +39036,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC248",
+    "stop_id": "IC247",
     "is_interchange": true,
     "routes": [
      "Caulfield - Mordialloc",
@@ -39266,7 +39056,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC249",
+    "stop_id": "IC248",
     "is_interchange": true,
     "routes": [
      "Rowville - Ferntree Gully",
@@ -39285,7 +39075,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC250",
+    "stop_id": "IC249",
     "is_interchange": true,
     "routes": [
      "Rowville - Ferntree Gully",
@@ -39304,7 +39094,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC251",
+    "stop_id": "IC250",
     "is_interchange": true,
     "routes": [
      "Glen Waverley - Dandenong"
@@ -39322,7 +39112,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC252",
+    "stop_id": "IC251",
     "is_interchange": true,
     "routes": [
      "Chirnside Park - Boronia",
@@ -39341,7 +39131,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC253",
+    "stop_id": "IC252",
     "is_interchange": true,
     "routes": [
      "Box Hill - Ringwood",
@@ -39360,7 +39150,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC254",
+    "stop_id": "IC253",
     "is_interchange": true,
     "routes": [
      "Burwood - Mitcham",
@@ -39379,7 +39169,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC255",
+    "stop_id": "IC254",
     "is_interchange": true,
     "routes": [
      "Chirnside Park - Boronia",
@@ -39398,7 +39188,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC256",
+    "stop_id": "IC255",
     "is_interchange": true,
     "routes": [
      "Chirnside Park - Boronia",
@@ -39417,7 +39207,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC257",
+    "stop_id": "IC256",
     "is_interchange": true,
     "routes": [
      "Chirnside Park - Boronia"
@@ -39435,7 +39225,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC258",
+    "stop_id": "IC257",
     "is_interchange": true,
     "routes": [
      "Vermont South - The Basin"
@@ -39453,7 +39243,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC259",
+    "stop_id": "IC258",
     "is_interchange": true,
     "routes": [
      "Ringwood - Bayswater North"
@@ -39471,7 +39261,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC260",
+    "stop_id": "IC259",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines",
@@ -39490,7 +39280,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC261",
+    "stop_id": "IC260",
     "is_interchange": true,
     "routes": [
      "Caulfield - Mordialloc",
@@ -39509,7 +39299,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC262",
+    "stop_id": "IC261",
     "is_interchange": true,
     "routes": [
      "Doncaster - Clarinda",
@@ -39528,7 +39318,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC263",
+    "stop_id": "IC262",
     "is_interchange": true,
     "routes": [
      "Monash - Springvale",
@@ -39547,7 +39337,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC264",
+    "stop_id": "IC263",
     "is_interchange": true,
     "routes": [
      "Mordialloc - Brighton Beach",
@@ -39566,7 +39356,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC265",
+    "stop_id": "IC264",
     "is_interchange": true,
     "routes": [
      "Sandringham - Frankston via Endeavour Hills"
@@ -39584,7 +39374,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC266",
+    "stop_id": "IC265",
     "is_interchange": true,
     "routes": [
      "Sandringham - Frankston via Endeavour Hills"
@@ -39602,7 +39392,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC267",
+    "stop_id": "IC266",
     "is_interchange": true,
     "routes": [
      "Sandringham - Frankston via Endeavour Hills"
@@ -39620,7 +39410,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC268",
+    "stop_id": "IC267",
     "is_interchange": true,
     "routes": [
      "Sandringham - Frankston via Endeavour Hills"
@@ -39638,7 +39428,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC269",
+    "stop_id": "IC268",
     "is_interchange": true,
     "routes": [
      "Dandenong - Cranbourne",
@@ -39657,7 +39447,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC270",
+    "stop_id": "IC269",
     "is_interchange": true,
     "routes": [
      "Dandenong - Cranbourne",
@@ -39676,7 +39466,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC271",
+    "stop_id": "IC270",
     "is_interchange": true,
     "routes": [
      "Dandenong - Cranbourne"
@@ -39694,7 +39484,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC272",
+    "stop_id": "IC271",
     "is_interchange": true,
     "routes": [
      "Dandenong - pakenham",
@@ -39715,7 +39505,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC273",
+    "stop_id": "IC272",
     "is_interchange": true,
     "routes": [
      "Dandenong South - Narre Warren North",
@@ -39734,7 +39524,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC274",
+    "stop_id": "IC273",
     "is_interchange": true,
     "routes": [
      "Fountain Gate - Cranbourne",
@@ -39753,7 +39543,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC275",
+    "stop_id": "IC274",
     "is_interchange": true,
     "routes": [
      "Fountain Gate - Cranbourne",
@@ -39772,7 +39562,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC276",
+    "stop_id": "IC275",
     "is_interchange": true,
     "routes": [
      "Fountain Gate - Cranbourne",
@@ -39791,7 +39581,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC277",
+    "stop_id": "IC276",
     "is_interchange": true,
     "routes": [
      "Fountain Gate - Cranbourne"
@@ -39809,7 +39599,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC278",
+    "stop_id": "IC277",
     "is_interchange": true,
     "routes": [
      "Dandenong South - Narre Warren North",
@@ -39828,7 +39618,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC279",
+    "stop_id": "IC278",
     "is_interchange": true,
     "routes": [
      "Dandenong South - Narre Warren North"
@@ -39846,7 +39636,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC280",
+    "stop_id": "IC279",
     "is_interchange": true,
     "routes": [
      "Dandenong South - Narre Warren North"
@@ -39864,7 +39654,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC281",
+    "stop_id": "IC280",
     "is_interchange": true,
     "routes": [
      "Dandenong - pakenham",
@@ -39885,7 +39675,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC282",
+    "stop_id": "IC281",
     "is_interchange": true,
     "routes": [
      "Dandenong - pakenham",
@@ -39904,7 +39694,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC283",
+    "stop_id": "IC282",
     "is_interchange": true,
     "routes": [
      "Clyde - Berwick",
@@ -39924,7 +39714,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC284",
+    "stop_id": "IC283",
     "is_interchange": true,
     "routes": [
      "Dandenong - pakenham",
@@ -39943,7 +39733,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC285",
+    "stop_id": "IC284",
     "is_interchange": true,
     "routes": [
      "Dandenong - pakenham",
@@ -39962,7 +39752,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC286",
+    "stop_id": "IC285",
     "is_interchange": true,
     "routes": [
      "Dandenong - pakenham",
@@ -39981,7 +39771,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC287",
+    "stop_id": "IC286",
     "is_interchange": true,
     "routes": [
      "Officer - Nar Nar Goon"
@@ -39999,7 +39789,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC288",
+    "stop_id": "IC287",
     "is_interchange": true,
     "routes": [
      "Officer - Nar Nar Goon"
@@ -40017,7 +39807,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC289",
+    "stop_id": "IC288",
     "is_interchange": true,
     "routes": [
      "Clyde - Berwick",
@@ -40037,7 +39827,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC290",
+    "stop_id": "IC289",
     "is_interchange": true,
     "routes": [
      "Clyde - Berwick",
@@ -40057,7 +39847,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC291",
+    "stop_id": "IC290",
     "is_interchange": true,
     "routes": [
      "Clyde - Berwick",
@@ -40076,7 +39866,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC292",
+    "stop_id": "IC291",
     "is_interchange": true,
     "routes": [
      "Clyde - Berwick",
@@ -40095,7 +39885,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC293",
+    "stop_id": "IC292",
     "is_interchange": true,
     "routes": [
      "Clyde - Berwick",
@@ -40114,7 +39904,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC294",
+    "stop_id": "IC293",
     "is_interchange": true,
     "routes": [
      "Clyde - Berwick",
@@ -40133,7 +39923,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC295",
+    "stop_id": "IC294",
     "is_interchange": true,
     "routes": [
      "Devon Meadows - Clyde",
@@ -40152,7 +39942,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC296",
+    "stop_id": "IC295",
     "is_interchange": true,
     "routes": [
      "Hampton Park - Officer",
@@ -40171,28 +39961,10 @@
     ]
    },
    "properties": {
-    "stop_id": "IC297",
+    "stop_id": "IC296",
     "is_interchange": true,
     "routes": [
      "Hampton Park - Officer"
-    ],
-    "name": null
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     145.13412675839766,
-     -38.15057887779293
-    ]
-   },
-   "properties": {
-    "stop_id": "IC298",
-    "is_interchange": true,
-    "routes": [
-     "Frankston - Karingal"
     ],
     "name": null
    }
@@ -40207,7 +39979,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC299",
+    "stop_id": "IC297",
     "is_interchange": true,
     "routes": [
      "Cranbourne - Berwick",
@@ -40226,7 +39998,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC300",
+    "stop_id": "IC298",
     "is_interchange": true,
     "routes": [
      "Cranbourne - Officer South",
@@ -40245,7 +40017,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC301",
+    "stop_id": "IC299",
     "is_interchange": true,
     "routes": [
      "Clyde",
@@ -40264,7 +40036,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC302",
+    "stop_id": "IC300",
     "is_interchange": true,
     "routes": [
      "Cranbourne - Berwick",
@@ -40283,7 +40055,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC303",
+    "stop_id": "IC301",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines",
@@ -40302,7 +40074,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC304",
+    "stop_id": "IC302",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines",
@@ -40321,7 +40093,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC305",
+    "stop_id": "IC303",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines",
@@ -40340,7 +40112,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC306",
+    "stop_id": "IC304",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines",
@@ -40359,7 +40131,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC307",
+    "stop_id": "IC305",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines",
@@ -40378,7 +40150,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC308",
+    "stop_id": "IC306",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines"
@@ -40396,7 +40168,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC309",
+    "stop_id": "IC307",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines"
@@ -40414,7 +40186,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC310",
+    "stop_id": "IC308",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines"
@@ -40432,7 +40204,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC311",
+    "stop_id": "IC309",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines"
@@ -40450,7 +40222,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC312",
+    "stop_id": "IC310",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines"
@@ -40468,7 +40240,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC313",
+    "stop_id": "IC311",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines"
@@ -40486,7 +40258,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC314",
+    "stop_id": "IC312",
     "is_interchange": true,
     "routes": [
      "703 Brighton - The Pines"
@@ -40504,7 +40276,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC315",
+    "stop_id": "IC313",
     "is_interchange": true,
     "routes": [
      "Bulleen",
@@ -40523,7 +40295,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC316",
+    "stop_id": "IC314",
     "is_interchange": true,
     "routes": [
      "Bulleen",
@@ -40542,7 +40314,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC317",
+    "stop_id": "IC315",
     "is_interchange": true,
     "routes": [
      "Doncaster - Templestowe",
@@ -40561,7 +40333,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC318",
+    "stop_id": "IC316",
     "is_interchange": true,
     "routes": [
      "Camberwell - Kew East",
@@ -40581,7 +40353,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC319",
+    "stop_id": "IC317",
     "is_interchange": true,
     "routes": [
      "Templestowe - Kew",
@@ -40600,7 +40372,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC320",
+    "stop_id": "IC318",
     "is_interchange": true,
     "routes": [
      "Templestowe - Kew",
@@ -40619,7 +40391,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC321",
+    "stop_id": "IC319",
     "is_interchange": true,
     "routes": [
      "Doncaster - Kew",
@@ -40638,7 +40410,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC322",
+    "stop_id": "IC320",
     "is_interchange": true,
     "routes": [
      "Balwyn North - Glen Iris",
@@ -40657,7 +40429,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC323",
+    "stop_id": "IC321",
     "is_interchange": true,
     "routes": [
      "Balwyn North - Burwood",
@@ -40676,7 +40448,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC324",
+    "stop_id": "IC322",
     "is_interchange": true,
     "routes": [
      "Balwyn North - Glen Iris",
@@ -40695,7 +40467,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC325",
+    "stop_id": "IC323",
     "is_interchange": true,
     "routes": [
      "Balwyn North - Burwood",
@@ -40714,7 +40486,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC326",
+    "stop_id": "IC324",
     "is_interchange": true,
     "routes": [
      "Balwyn North - Burwood",
@@ -40733,7 +40505,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC327",
+    "stop_id": "IC325",
     "is_interchange": true,
     "routes": [
      "Doncaster - Clarinda",
@@ -40753,7 +40525,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC328",
+    "stop_id": "IC326",
     "is_interchange": true,
     "routes": [
      "Camberwell - Kew East",
@@ -40772,7 +40544,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC329",
+    "stop_id": "IC327",
     "is_interchange": true,
     "routes": [
      "Doncaster - Clarinda",
@@ -40791,7 +40563,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC330",
+    "stop_id": "IC328",
     "is_interchange": true,
     "routes": [
      "Balwyn North - Burwood",
@@ -40811,7 +40583,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC331",
+    "stop_id": "IC329",
     "is_interchange": true,
     "routes": [
      "Box Hill - Caulfield",
@@ -40830,7 +40602,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC332",
+    "stop_id": "IC330",
     "is_interchange": true,
     "routes": [
      "Doncaster - Clarinda",
@@ -40849,7 +40621,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC333",
+    "stop_id": "IC331",
     "is_interchange": true,
     "routes": [
      "Doncaster - Clarinda"
@@ -40867,7 +40639,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC334",
+    "stop_id": "IC332",
     "is_interchange": true,
     "routes": [
      "Doncaster - Clarinda"
@@ -40885,7 +40657,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC335",
+    "stop_id": "IC333",
     "is_interchange": true,
     "routes": [
      "Doncaster - Clarinda"
@@ -40903,7 +40675,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC336",
+    "stop_id": "IC334",
     "is_interchange": true,
     "routes": [
      "Doncaster - Clarinda"
@@ -40921,7 +40693,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC337",
+    "stop_id": "IC335",
     "is_interchange": true,
     "routes": [
      "Doncaster - Clarinda",
@@ -40940,7 +40712,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC338",
+    "stop_id": "IC336",
     "is_interchange": true,
     "routes": [
      "Doncaster - Clarinda"
@@ -40958,7 +40730,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC339",
+    "stop_id": "IC337",
     "is_interchange": true,
     "routes": [
      "Doncaster - Clarinda"
@@ -40976,7 +40748,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC340",
+    "stop_id": "IC338",
     "is_interchange": true,
     "routes": [
      "Caulfield - Mordialloc",
@@ -40995,7 +40767,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC341",
+    "stop_id": "IC339",
     "is_interchange": true,
     "routes": [
      "Caulfield - Mordialloc",
@@ -41015,7 +40787,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC342",
+    "stop_id": "IC340",
     "is_interchange": true,
     "routes": [
      "Caulfield - Mordialloc",
@@ -41034,7 +40806,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC343",
+    "stop_id": "IC341",
     "is_interchange": true,
     "routes": [
      "Caulfield - Mordialloc"
@@ -41052,7 +40824,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC344",
+    "stop_id": "IC342",
     "is_interchange": true,
     "routes": [
      "Caulfield - Mordialloc",
@@ -41071,7 +40843,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC345",
+    "stop_id": "IC343",
     "is_interchange": true,
     "routes": [
      "Caulfield - Mordialloc"
@@ -41089,7 +40861,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC346",
+    "stop_id": "IC344",
     "is_interchange": true,
     "routes": [
      "Caulfield - Mordialloc"
@@ -41107,7 +40879,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC347",
+    "stop_id": "IC345",
     "is_interchange": true,
     "routes": [
      "Caulfield - Sandringham",
@@ -41126,7 +40898,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC348",
+    "stop_id": "IC346",
     "is_interchange": true,
     "routes": [
      "Caulfield - Sandringham"
@@ -41144,7 +40916,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC349",
+    "stop_id": "IC347",
     "is_interchange": true,
     "routes": [
      "Caulfield - Sandringham"
@@ -41162,7 +40934,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC350",
+    "stop_id": "IC348",
     "is_interchange": true,
     "routes": [
      "Caulfield - Sandringham"
@@ -41180,7 +40952,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC351",
+    "stop_id": "IC349",
     "is_interchange": true,
     "routes": [
      "Caulfield - Sandringham"
@@ -41198,7 +40970,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC352",
+    "stop_id": "IC350",
     "is_interchange": true,
     "routes": [
      "Caulfield - Sandringham"
@@ -41216,7 +40988,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC353",
+    "stop_id": "IC351",
     "is_interchange": true,
     "routes": [
      "Glen Iris - Moorabin",
@@ -41235,7 +41007,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC354",
+    "stop_id": "IC352",
     "is_interchange": true,
     "routes": [
      "Glen Waverley - Caulfield"
@@ -41253,7 +41025,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC355",
+    "stop_id": "IC353",
     "is_interchange": true,
     "routes": [
      "Balwyn North - Glen Iris",
@@ -41272,7 +41044,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC356",
+    "stop_id": "IC354",
     "is_interchange": true,
     "routes": [
      "Balwyn North - Burwood"
@@ -41290,7 +41062,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC357",
+    "stop_id": "IC355",
     "is_interchange": true,
     "routes": [
      "Balwyn North - Burwood"
@@ -41308,7 +41080,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC358",
+    "stop_id": "IC356",
     "is_interchange": true,
     "routes": [
      "Monash - Springvale"
@@ -41326,7 +41098,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC359",
+    "stop_id": "IC357",
     "is_interchange": true,
     "routes": [
      "Elwood - Richmond"
@@ -41344,7 +41116,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC360",
+    "stop_id": "IC358",
     "is_interchange": true,
     "routes": [
      "Elwood - Richmond"
@@ -41362,7 +41134,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC361",
+    "stop_id": "IC359",
     "is_interchange": true,
     "routes": [
      "Elwood - Richmond"
@@ -41380,7 +41152,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC362",
+    "stop_id": "IC360",
     "is_interchange": true,
     "routes": [
      "Elwood - Richmond"
@@ -41398,7 +41170,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC363",
+    "stop_id": "IC361",
     "is_interchange": true,
     "routes": [
      "Elwood - Richmond"
@@ -41416,7 +41188,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC364",
+    "stop_id": "IC362",
     "is_interchange": true,
     "routes": [
      "Elwood - Richmond"
@@ -41434,7 +41206,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC365",
+    "stop_id": "IC363",
     "is_interchange": true,
     "routes": [
      "Elwood - Richmond"
@@ -41452,7 +41224,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC366",
+    "stop_id": "IC364",
     "is_interchange": true,
     "routes": [
      "Elwood - Richmond"
@@ -41470,7 +41242,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC367",
+    "stop_id": "IC365",
     "is_interchange": true,
     "routes": [
      "Elwood - Richmond"
@@ -41488,7 +41260,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC368",
+    "stop_id": "IC366",
     "is_interchange": true,
     "routes": [
      "Glen Iris - Moorabin",
@@ -41507,7 +41279,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC369",
+    "stop_id": "IC367",
     "is_interchange": true,
     "routes": [
      "Mordialloc - Brighton Beach",
@@ -41526,7 +41298,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC370",
+    "stop_id": "IC368",
     "is_interchange": true,
     "routes": [
      "Mordialloc - Brighton Beach"
@@ -41544,7 +41316,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC371",
+    "stop_id": "IC369",
     "is_interchange": true,
     "routes": [
      "Mordialloc - Brighton Beach"
@@ -41562,7 +41334,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC372",
+    "stop_id": "IC370",
     "is_interchange": true,
     "routes": [
      "Glen Iris - Moorabin"
@@ -41580,7 +41352,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC373",
+    "stop_id": "IC371",
     "is_interchange": true,
     "routes": [
      "Box Hill - Caulfield"
@@ -41598,7 +41370,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC374",
+    "stop_id": "IC372",
     "is_interchange": true,
     "routes": [
      "Box Hill - Caulfield"
@@ -41616,7 +41388,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC375",
+    "stop_id": "IC373",
     "is_interchange": true,
     "routes": [
      "Box Hill - Caulfield"
@@ -41634,7 +41406,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC376",
+    "stop_id": "IC374",
     "is_interchange": true,
     "routes": [
      "Camberwell - Kew East"
@@ -41652,7 +41424,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC377",
+    "stop_id": "IC375",
     "is_interchange": true,
     "routes": [
      "Camberwell - Kew East"
@@ -41670,7 +41442,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC378",
+    "stop_id": "IC376",
     "is_interchange": true,
     "routes": [
      "Officer - Narre Warren"
@@ -41688,7 +41460,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC379",
+    "stop_id": "IC377",
     "is_interchange": true,
     "routes": [
      "Officer - Narre Warren"
@@ -41706,7 +41478,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC380",
+    "stop_id": "IC378",
     "is_interchange": true,
     "routes": [
      "Officer - Narre Warren"
@@ -41724,7 +41496,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC381",
+    "stop_id": "IC379",
     "is_interchange": true,
     "routes": [
      "Officer - Narre Warren"
@@ -41742,7 +41514,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC382",
+    "stop_id": "IC380",
     "is_interchange": true,
     "routes": [
      "Clyde",
@@ -41761,7 +41533,7 @@
     ]
    },
    "properties": {
-    "stop_id": "IC383",
+    "stop_id": "IC381",
     "is_interchange": true,
     "routes": [
      "Skye - Cardinia"
@@ -56000,6 +55772,24 @@
    },
    "properties": {
     "stop_id": "Dandenong - Frankston__S2",
+    "is_interchange": false,
+    "routes": [
+     "Dandenong - Frankston"
+    ],
+    "name": null
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     145.12632833817196,
+     -38.145822976754346
+    ]
+   },
+   "properties": {
+    "stop_id": "Dandenong - Frankston__S3",
     "is_interchange": false,
     "routes": [
      "Dandenong - Frankston"
@@ -72938,6 +72728,24 @@
    },
    "properties": {
     "stop_id": "Frankston - Karingal__S5",
+    "is_interchange": false,
+    "routes": [
+     "Frankston - Karingal"
+    ],
+    "name": null
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     145.1344203795762,
+     -38.149899628145036
+    ]
+   },
+   "properties": {
+    "stop_id": "Frankston - Karingal__S6",
     "is_interchange": false,
     "routes": [
      "Frankston - Karingal"
