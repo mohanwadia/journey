@@ -983,11 +983,13 @@ function buildItinerary(edges) {
       // row) collapse into a single leg, the same way consecutive
       // same-route ride edges do below — otherwise the itinerary shows
       // back-to-back "Walk x min" / "Walk y min" items for what's really
-      // one continuous walk.
+      // one continuous walk. walk_through edges (zero-weight pass-through
+      // nodes along the footpath) are skipped over rather than treated as
+      // a break, since they're not a separate leg either.
       let sum = e.weight_min;
       let distM = edgeDistanceM(e);
       let j = i + 1;
-      while (j < edges.length && edges[j].type === 'walk') {
+      while (j < edges.length && (edges[j].type === 'walk' || edges[j].type === 'walk_through')) {
         sum += edges[j].weight_min;
         distM += edgeDistanceM(edges[j]);
         j++;
