@@ -126,6 +126,10 @@ html, body {
   font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--ink);
+  cursor: pointer;
+}
+#panel-title:hover {
+  text-decoration: underline;
 }
 
 #tabs {
@@ -465,11 +469,16 @@ html, body {
    instructions, summary, itinerary) is stripped down to just the
    up-to-four network combo tabs, plus the travel-time legend on the
    Isochrone tab — shown as a slim strip across the full width of the
-   bottom of the screen rather than a side/bottom panel. This applies at
-   every viewport size (mobile portrait *and* a half-width laptop-screen
-   embed), so it's written unconditionally rather than inside the
-   max-width: 700px block above, and !important is used where needed to
-   win over that block's own #panel/#layout rules.
+   bottom of the screen rather than a side/bottom panel. The title/
+   Reset/Share bar stays, just shrunk down (see reset-btn/share-btn/
+   panel-title's preview-mode behavior in app.js — they act differently
+   in preview: Reset restores the view, Share shares the plain non-
+   preview URL, and the title opens the non-preview URL in a new tab).
+   This layout applies at every viewport size (mobile portrait *and* a
+   half-width laptop-screen embed), so it's written unconditionally
+   rather than inside the max-width: 700px block above, and !important
+   is used where needed to win over that block's own #panel/#layout
+   rules.
    ------------------------------------------------------------------- */
 body.preview-mode #layout {
   flex-direction: column;
@@ -481,15 +490,16 @@ body.preview-mode #map {
 
 body.preview-mode #panel {
   width: 100% !important;
-  flex: 0 0 15vh !important;
-  max-height: 15vh !important;
+  flex: 0 0 auto !important;
+  min-height: 15vh;
+  max-height: none !important;
   border-left: none;
   border-top: 1px solid var(--line);
-  overflow-y: auto;
+  overflow: visible;
 }
 
-/* Hide everything except the combo tabs (+ legend on the Isochrone tab). */
-body.preview-mode #panel-header,
+/* Hide the tab switcher and the journey-detail blocks; the title/Reset/
+   Share bar and the combo tabs (+ legend on the Isochrone tab) stay. */
 body.preview-mode #tabs,
 body.preview-mode .instruction-banner,
 body.preview-mode #summary,
@@ -498,20 +508,24 @@ body.preview-mode #empty-state {
   display: none !important;
 }
 
+body.preview-mode #panel-header {
+  padding: 8px 14px;
+}
+
 body.preview-mode #combo-selector,
 body.preview-mode #iso-combo-selector {
   display: block !important;
 }
 
 body.preview-mode .panel-block {
-  padding: 10px 14px;
+  padding: 8px 14px;
   border-bottom: none;
 }
 
 /* Isochrone tab's legend: lay it out horizontally like the mobile view
-   above, so both it and the combo row fit comfortably inside 15vh. */
+   above, so it, the combo row, and the header all fit inside 15vh. */
 body.preview-mode #iso-legend {
-  padding: 8px 14px 10px;
+  padding: 4px 14px 8px;
 }
 
 body.preview-mode #iso-legend h2 {
@@ -525,5 +539,5 @@ body.preview-mode .legend-list {
 }
 
 body.preview-mode .combo-btn {
-  padding: 6px 4px;
+  padding: 5px 4px;
 }

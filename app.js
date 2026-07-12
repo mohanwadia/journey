@@ -99,6 +99,13 @@ let isoLoadingRest = false;     // true from when "Both" is shown until the othe
 const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === '1';
 if (isPreviewMode) document.body.classList.add('preview-mode');
 
+// The whole-network view (set once, on initial load) and whichever view
+// the current preview link is supposed to open on — used to restore the
+// view when the preview's Reset button is clicked (see reset-btn listener
+// below). Both are { bounds, padding } or { center, zoom }.
+let networkBounds = null;
+let previewDefaultView = null;
+
 const map = L.map('map', { zoomControl: true });
 
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -304,7 +311,9 @@ function renderRouteLines(routesGeojson) {
   });
   if (srlEnabled) srlRouteLayer.addTo(map);
 
-  map.fitBounds(computeGeojsonBounds(routesGeojson), { padding: [30, 30] });
+  networkBounds = computeGeojsonBounds(routesGeojson);
+  map.fitBounds(networkBounds, { padding: [30, 30] });
+  if (isPreviewMode) previewDefaultView = { bounds: networkBounds, padding: [30, 30] };
 }
 
 // Scans every coordinate in a LineString-only FeatureCollection directly,
@@ -658,6 +667,31 @@ function estimateIsochroneAreaKm2(locations, thresholdMin) {
   }
 
   return (filled * stepX * stepY) / 1e6; // m² -> km²
+}
+
+// Bounding box (as an L.latLngBounds) covering every circle that makes up
+// the isochrone at a given threshold — i.e. the smallest view that still
+// shows the whole reachable area at that threshold, no more. Used to zoom
+// the map in appropriately when a URL loads straight into an isochrone
+// (see loadFromURL) instead of leaving it at a generic fixed zoom level
+// that might show far more (or less) than the actual coverage.
+function isochroneBoundsAtThreshold(locations, thresholdMin) {
+  let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+  let any = false;
+  for (const loc of locations) {
+    if (loc.min > thresholdMin) continue;
+    const radiusM = (thresholdMin - loc.min) * WALK_SPEED_M_PER_MIN;
+    if (radiusM <= 0) continue;
+    any = true;
+    const dLat = radiusM / 111320;
+    const dLon = radiusM / (111320 * Math.cos((loc.lat * Math.PI) / 180));
+    minLat = Math.min(minLat, loc.lat - dLat);
+    maxLat = Math.max(maxLat, loc.lat + dLat);
+    minLon = Math.min(minLon, loc.lon - dLon);
+    maxLon = Math.max(maxLon, loc.lon + dLon);
+  }
+  if (!any) return null;
+  return L.latLngBounds([minLat, minLon], [maxLat, maxLon]);
 }
 
 // Each threshold gets its own Leaflet pane + canvas renderer so overlapping
@@ -1463,7 +1497,9 @@ function loadFromURL() {
     destLatLng = L.latLng(d.lat, d.lng);
     originMarker = L.circleMarker(originLatLng, { radius: 7, color: '#1a1d1f', weight: 2, fillColor: '#1a1d1f', fillOpacity: 1 }).addTo(map);
     destMarker = L.marker(destLatLng, { icon: destPinIcon() }).addTo(map);
-    map.fitBounds(L.latLngBounds([originLatLng, destLatLng]), { padding: [80, 80] });
+    const journeyBounds = L.latLngBounds([originLatLng, destLatLng]);
+    map.fitBounds(journeyBounds, { padding: [80, 80] });
+    if (isPreviewMode) previewDefaultView = { bounds: journeyBounds, padding: [80, 80] };
 
     computeAllJourneyCombos(originLatLng, destLatLng);
     const anyResult = JOURNEY_COMBOS.some((c) => journeyResults[c.key]);
@@ -1513,7 +1549,23 @@ function loadFromURL() {
       }
       syncURL(false);
     });
-    map.setView(latlng, map.getZoom() || 14);
+
+    // beginIsoCompute computes the "Both" combo synchronously before
+    // returning (the other three combos are deferred), so isoResults.both
+    // is already available here. Fit the view to its largest-threshold
+    // coverage area so a linked-to isochrone opens zoomed in appropriately
+    // — showing the whole 60-min area but not much beyond it — rather than
+    // a generic fixed zoom level that might show far more or less.
+    const maxThresholdMin = ISO_THRESHOLDS_MIN[ISO_THRESHOLDS_MIN.length - 1];
+    const isoBounds = isoResults.both ? isochroneBoundsAtThreshold(isoResults.both.locations, maxThresholdMin) : null;
+    if (isoBounds) {
+      map.fitBounds(isoBounds, { padding: [20, 20] });
+      if (isPreviewMode) previewDefaultView = { bounds: isoBounds, padding: [20, 20] };
+    } else {
+      const fallbackZoom = map.getZoom() || 14;
+      map.setView(latlng, fallbackZoom);
+      if (isPreviewMode) previewDefaultView = { center: latlng, zoom: fallbackZoom };
+    }
     document.getElementById('iso-instructions').classList.add('hidden');
   }
 }
@@ -1664,7 +1716,26 @@ function onJourneyClick(e) {
   document.getElementById('instructions').classList.add('hidden');
 }
 
+// In preview mode, clicking to place pins is disabled entirely (see
+// onMapClick), so there's never anything to clear — instead "Reset" just
+// restores whatever view (pan/zoom) the preview opened on, undoing any
+// panning/zooming the viewer has done since.
+function resetPreviewView() {
+  if (previewDefaultView && previewDefaultView.bounds) {
+    map.fitBounds(previewDefaultView.bounds, { padding: previewDefaultView.padding || [30, 30] });
+  } else if (previewDefaultView && previewDefaultView.center) {
+    map.setView(previewDefaultView.center, previewDefaultView.zoom);
+  } else if (networkBounds) {
+    map.fitBounds(networkBounds, { padding: [30, 30] });
+  }
+}
+
 document.getElementById('reset-btn').addEventListener('click', () => {
+  if (isPreviewMode) {
+    resetPreviewView();
+    return;
+  }
+
   originLatLng = null;
   destLatLng = null;
   journeyResults = {};
@@ -1701,7 +1772,56 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   syncURL(false);
 });
 
-document.getElementById('share-btn').addEventListener('click', shareOrCopyLink);
+// Strips the ?preview=1 param from the current URL — used any time the
+// preview UI hands the viewer off to the real, interactive experience
+// (the Share button, and clicking the mohanwadia.com/srl title).
+function nonPreviewURL() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('preview');
+  return url.toString();
+}
+
+// Preview mode's Share button: shares/copies the exact current URL (minus
+// ?preview=1, so whoever opens it gets the real interactive map) with no
+// extra share text, unlike the normal Share button's viral copy.
+function previewShare() {
+  const url = nonPreviewURL();
+  const shareBtn = document.getElementById('share-btn');
+
+  if (isMobileOrTablet() && navigator.share) {
+    navigator.share({ url }).catch(() => {});
+    return;
+  }
+
+  navigator.clipboard.writeText(url).then(() => {
+    if (!shareBtn) return;
+    const original = shareBtn.textContent;
+    shareBtn.textContent = 'Link copied!';
+    setTimeout(() => { shareBtn.textContent = original; }, 1500);
+  }).catch(() => {
+    window.prompt('Copy this link:', url);
+  });
+}
+
+document.getElementById('share-btn').addEventListener('click', () => {
+  if (isPreviewMode) previewShare();
+  else shareOrCopyLink();
+});
+
+// The "mohanwadia.com/srl" title: normally a home link — takes the person
+// to the Journey tab, zoomed out, with no pins (i.e. a bare-params reload).
+// In preview mode, instead of navigating away from the preview itself, it
+// opens the *interactive* version of exactly what's being previewed (same
+// pins/point/combo, just without ?preview=1) in a new tab.
+document.getElementById('panel-title').addEventListener('click', () => {
+  if (isPreviewMode) {
+    window.open(nonPreviewURL(), '_blank');
+    return;
+  }
+  const url = new URL(window.location.href);
+  url.search = '';
+  window.location.href = url.toString();
+});
 
 // ---------------------------------------------------------------------------
 // Tabs
