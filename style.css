@@ -457,3 +457,73 @@ html, body {
     gap: 8px 16px;
   }
 }
+
+/* ---------------------------------------------------------------------
+   Preview mode (?preview=1) — used when the map is embedded read-only
+   (a blog post, a shared screenshot, etc.). The map stays pannable and
+   zoomable, but the full sidebar chrome (title, reset/share, click
+   instructions, summary, itinerary) is stripped down to just the
+   up-to-four network combo tabs, plus the travel-time legend on the
+   Isochrone tab — shown as a slim strip across the full width of the
+   bottom of the screen rather than a side/bottom panel. This applies at
+   every viewport size (mobile portrait *and* a half-width laptop-screen
+   embed), so it's written unconditionally rather than inside the
+   max-width: 700px block above, and !important is used where needed to
+   win over that block's own #panel/#layout rules.
+   ------------------------------------------------------------------- */
+body.preview-mode #layout {
+  flex-direction: column;
+}
+
+body.preview-mode #map {
+  cursor: default;
+}
+
+body.preview-mode #panel {
+  width: 100% !important;
+  flex: 0 0 15vh !important;
+  max-height: 15vh !important;
+  border-left: none;
+  border-top: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+/* Hide everything except the combo tabs (+ legend on the Isochrone tab). */
+body.preview-mode #panel-header,
+body.preview-mode #tabs,
+body.preview-mode .instruction-banner,
+body.preview-mode #summary,
+body.preview-mode #itinerary,
+body.preview-mode #empty-state {
+  display: none !important;
+}
+
+body.preview-mode #combo-selector,
+body.preview-mode #iso-combo-selector {
+  display: block !important;
+}
+
+body.preview-mode .panel-block {
+  padding: 10px 14px;
+  border-bottom: none;
+}
+
+/* Isochrone tab's legend: lay it out horizontally like the mobile view
+   above, so both it and the combo row fit comfortably inside 15vh. */
+body.preview-mode #iso-legend {
+  padding: 8px 14px 10px;
+}
+
+body.preview-mode #iso-legend h2 {
+  display: none;
+}
+
+body.preview-mode .legend-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+body.preview-mode .combo-btn {
+  padding: 6px 4px;
+}

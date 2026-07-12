@@ -88,6 +88,17 @@ let isoCombo = 'both';          // which combo's isochrone is currently shown
 let isoResults = {};            // combo key -> { locations, areaKm2 } (areaKm2 at the largest threshold)
 let isoLoadingRest = false;     // true from when "Both" is shown until the other 3 combos finish computing
 
+// Preview mode (?preview=1): used for embeds (blog posts, small linked-out
+// screenshots, etc.) — the map is still pannable/zoomable, but clicking to
+// (re)place a pin is disabled, and the full sidebar (title, reset/share,
+// instructions, summary, itinerary) is replaced by a slim bar along the
+// bottom of the screen showing just the up-to-four network combo tabs
+// (Current / Bus Reform / SRL / Both), plus the travel-time legend on the
+// Isochrone tab. See the body.preview-mode rules in style.css for the
+// layout side of this, and onMapClick below for the click-disabling.
+const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === '1';
+if (isPreviewMode) document.body.classList.add('preview-mode');
+
 const map = L.map('map', { zoomControl: true });
 
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -1605,6 +1616,7 @@ function shareOrCopyLink() {
 
 function onMapClick(e) {
   if (!graph) return;
+  if (isPreviewMode) return; // preview embeds are look-but-don't-touch: pan/zoom still work via Leaflet's own handlers, only click-to-place is disabled
   if (currentTab === 'isochrone') {
     onIsochroneClick(e);
   } else {
