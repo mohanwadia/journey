@@ -979,11 +979,23 @@ function buildItinerary(edges) {
     }
 
     if (e.type === 'walk') {
-      walkTotal += e.weight_min;
-      const distM = edgeDistanceM(e);
+      // Consecutive walk edges (e.g. several OSM footpath segments in a
+      // row) collapse into a single leg, the same way consecutive
+      // same-route ride edges do below — otherwise the itinerary shows
+      // back-to-back "Walk x min" / "Walk y min" items for what's really
+      // one continuous walk.
+      let sum = e.weight_min;
+      let distM = edgeDistanceM(e);
+      let j = i + 1;
+      while (j < edges.length && edges[j].type === 'walk') {
+        sum += edges[j].weight_min;
+        distM += edgeDistanceM(edges[j]);
+        j++;
+      }
+      walkTotal += sum;
       distTotal += distM;
-      legs.push({ type: 'walk', label: 'Walk', min: e.weight_min, distM });
-      i++; continue;
+      legs.push({ type: 'walk', label: 'Walk', min: sum, distM });
+      i = j; continue;
     }
 
     if (e.type === 'board') {
