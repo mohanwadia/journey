@@ -139,12 +139,23 @@ function routeCorridor(routeId) {
 function isReformBusCorridor(c) { return c === 'B1' || c === 'B2'; }
 function isExistingBusCorridor(c) { return c === 'EXIST_BUS'; }
 
-// Rebuilds the routing edge index from scratch, skipping SRL edges when the
-// line is toggled off, and skipping whichever bus network (reform vs
-// existing) isn't currently selected. Cheap enough to call on every toggle —
-// the graph is small — and simpler than patching a live adjacency map in place.
+// Rebuilds the routing edge index, skipping SRL edges when the line is
+// toggled off, and skipping whichever bus network (reform vs existing) isn't
+// currently selected. There are only ever 4 reachable (srl, busReform)
+// combinations (see JOURNEY_COMBOS), and both tabs recompute all 4 of them
+// on every single click — so each combination's adjacency list is filtered
+// out of graph.edges once and cached, instead of re-scanning every edge in
+// the graph every time the same combination comes up again.
+const adjacencyCache = new Map();
 function rebuildAdjacency() {
-  baseAdj = new Map();
+  const cacheKey = `${srlEnabled}|${busReformEnabled}`;
+  const cached = adjacencyCache.get(cacheKey);
+  if (cached) {
+    baseAdj = cached;
+    return;
+  }
+
+  const adj = new Map();
   for (const e of graph.edges) {
     if (!srlEnabled && e.route === 'RAIL:SRL') continue;
     if (e.route) {
@@ -152,9 +163,12 @@ function rebuildAdjacency() {
       if (busReformEnabled && isExistingBusCorridor(corridor)) continue;
       if (!busReformEnabled && isReformBusCorridor(corridor)) continue;
     }
-    if (!baseAdj.has(e.from)) baseAdj.set(e.from, []);
-    baseAdj.get(e.from).push(e);
+    if (!adj.has(e.from)) adj.set(e.from, []);
+    adj.get(e.from).push(e);
   }
+
+  adjacencyCache.set(cacheKey, adj);
+  baseAdj = adj;
 }
 
 function buildStopIndex() {
@@ -171,9 +185,18 @@ function renderStopMarkers() {
   srlStopMarkers = [];
   reformBusStopMarkers = [];
   existingBusStopMarkers = [];
+
+  // Build a stop_id -> hub_in node index once instead of re-scanning every
+  // node in the graph for every named stop (that was O(named stops x total
+  // nodes) and gets very slow as the network grows).
+  const hubInByStop = new Map();
+  for (const n of Object.values(graph.nodes)) {
+    if (n.type === 'hub_in') hubInByStop.set(n.stop_id, n);
+  }
+
   for (const [stopId, name] of stopNames.entries()) {
     // any hub_in node for this stop gives us its coordinates
-    const node = Object.values(graph.nodes).find(n => n.stop_id === stopId && n.type === 'hub_in');
+    const node = hubInByStop.get(stopId);
     if (!node) continue;
     const marker = L.circleMarker([node.lat, node.lon], {
       radius: 3, weight: 1, color: '#1a1d1f', fillColor: '#f7f6f3', fillOpacity: 1,
@@ -269,8 +292,23 @@ function renderRouteLines(routesGeojson) {
   });
   if (srlEnabled) srlRouteLayer.addTo(map);
 
-  const fullLayer = L.geoJSON(routesGeojson);
-  map.fitBounds(fullLayer.getBounds(), { padding: [30, 30] });
+  map.fitBounds(computeGeojsonBounds(routesGeojson), { padding: [30, 30] });
+}
+
+// Scans every coordinate in a LineString-only FeatureCollection directly,
+// instead of constructing a full (unused, never-added-to-map) L.geoJSON
+// layer just to read its bounds off it.
+function computeGeojsonBounds(featureCollection) {
+  let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+  for (const f of featureCollection.features) {
+    for (const [lon, lat] of f.geometry.coordinates) {
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lon < minLon) minLon = lon;
+      if (lon > maxLon) maxLon = lon;
+    }
+  }
+  return L.latLngBounds([minLat, minLon], [maxLat, maxLon]);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,18 +340,33 @@ function edgeDistanceM(e) {
   return haversineMeters(a.lat, a.lon, b.lat, b.lon);
 }
 
+// candidates is every hub_in/hub_out node in the whole network (potentially
+// many thousands of stops), and this runs several times per click — so this
+// keeps a bounded top-k list (size k) in a single pass instead of cloning
+// and sorting the entire candidate array, and tracks the single globally-
+// closest candidate along the way so the far-off-network fallback below
+// doesn't need a second full pass re-computing every distance again.
 function nearestStops(lat, lon, candidates, k, maxM) {
-  const scored = candidates
-    .map((c) => ({ ...c, dist: haversineMeters(lat, lon, c.lat, c.lon) }))
-    .filter((c) => c.dist <= maxM)
-    .sort((a, b) => a.dist - b.dist);
-  if (scored.length > 0) return scored.slice(0, k);
+  const top = []; // ascending by dist, length capped at k, only entries within maxM
+  let best = null; // globally closest regardless of maxM, for the fallback
+
+  for (const c of candidates) {
+    const dist = haversineMeters(lat, lon, c.lat, c.lon);
+    if (!best || dist < best.dist) best = { ...c, dist };
+    if (dist > maxM) continue;
+
+    if (top.length < k || dist < top[top.length - 1].dist) {
+      let i = top.length;
+      while (i > 0 && top[i - 1].dist > dist) i--;
+      top.splice(i, 0, { ...c, dist });
+      if (top.length > k) top.pop();
+    }
+  }
+
+  if (top.length > 0) return top;
   // fallback: nothing within maxM, just take the single closest so the
   // tool never silently fails on a click far from any stop
-  return candidates
-    .map((c) => ({ ...c, dist: haversineMeters(lat, lon, c.lat, c.lon) }))
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, 1);
+  return best ? [best] : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -354,7 +407,17 @@ class MinHeap {
 }
 
 function runDijkstra(startId, endId, extraAdj) {
-  const getEdges = (nodeId) => (baseAdj.get(nodeId) || []).concat(extraAdj.get(nodeId) || []);
+  // extraAdj only ever has entries for the injected origin/destination nodes
+  // and the handful of stops within walking distance of them — so for the
+  // overwhelming majority of nodes visited, avoid allocating a new array via
+  // concat() and just hand back the base edge list directly.
+  const getEdges = (nodeId) => {
+    const extra = extraAdj.get(nodeId);
+    const base = baseAdj.get(nodeId);
+    if (!extra) return base || [];
+    if (!base) return extra;
+    return base.concat(extra);
+  };
 
   const dist = new Map([[startId, 0]]);
   const prev = new Map();
@@ -453,7 +516,17 @@ const ISO_FILL_OPACITY = { 20: 0.4, 40: 0.24, 60: 0.14 };
 // Like runDijkstra, but explores every node within maxCost of startId
 // instead of stopping at a single destination.
 function runDijkstraOneToAll(startId, extraAdj, maxCost) {
-  const getEdges = (nodeId) => (baseAdj.get(nodeId) || []).concat(extraAdj.get(nodeId) || []);
+  // Same reasoning as runDijkstra's getEdges: skip the concat() allocation
+  // for nodes with no extra edges. This one matters even more, since a
+  // one-to-all search visits every node within the time budget rather than
+  // stopping at a single destination.
+  const getEdges = (nodeId) => {
+    const extra = extraAdj.get(nodeId);
+    const base = baseAdj.get(nodeId);
+    if (!extra) return base || [];
+    if (!base) return extra;
+    return base.concat(extra);
+  };
 
   const dist = new Map([[startId, 0]]);
   const visited = new Set();
@@ -541,7 +614,7 @@ function estimateIsochroneAreaKm2(locations, thresholdMin) {
 
   // Project circle centers to a flat local meters grid — fine at this scale
   // and avoids a trig call (haversine) per grid cell per circle below.
-  const pc = circles.map((c) => ({ x: c.lon * mPerDegLon, y: c.lat * mPerDegLat, r: c.radiusM }));
+  const pc = circles.map((c) => ({ x: c.lon * mPerDegLon, y: c.lat * mPerDegLat, r: c.radiusM, r2: c.radiusM * c.radiusM }));
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const c of pc) {
@@ -560,7 +633,7 @@ function estimateIsochroneAreaKm2(locations, thresholdMin) {
       const x = minX + (j + 0.5) * stepX;
       for (let k = 0; k < pc.length; k++) {
         const dx = x - pc[k].x, dy = y - pc[k].y;
-        if (dx * dx + dy * dy <= pc[k].r * pc[k].r) { filled++; break; }
+        if (dx * dx + dy * dy <= pc[k].r2) { filled++; break; }
       }
     }
   }

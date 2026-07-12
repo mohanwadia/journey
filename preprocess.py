@@ -600,7 +600,19 @@ def build_graph(routes, stops, route_stop_sequences):
     def add_node(node_id, stop_id, kind, route_id=None):
         s = stops[stop_id]
         lon, lat = to_wgs84(s.x, s.y)
-        nodes[node_id] = {"id": node_id, "stop_id": stop_id, "lat": lat, "lon": lon, "type": kind, "route": route_id}
+        # No "id" field: app.js only ever looks nodes up via graph.nodes[id],
+        # never reads a .id property, so storing it again inside the value
+        # would just duplicate the dict key on every node for nothing.
+        # lat/lon rounded to 6 decimal places (~11cm) — far finer than a
+        # walking/transit router (or a map) needs, but noticeably smaller
+        # as JSON text than full float precision.
+        # "route" is only meaningful (and only ever read) for type="route"
+        # nodes, so it's omitted entirely for hub_in/hub_out rather than
+        # writing "route": null on every single one of them.
+        node = {"stop_id": stop_id, "lat": round(lat, 6), "lon": round(lon, 6), "type": kind}
+        if route_id is not None:
+            node["route"] = route_id
+        nodes[node_id] = node
 
     def hub_in_id(stop_id):
         return f"{stop_id}__HUB_IN"
@@ -671,12 +683,17 @@ def export_routes_geojson(routes, path):
     for rid, r in routes.items():
         features.append({
             "type": "Feature",
-            "geometry": {"type": "LineString", "coordinates": [list(c) for c in r["line_wgs_coords"]]},
+            "geometry": {"type": "LineString",
+                         "coordinates": [[round(lon, 6), round(lat, 6)] for lon, lat in r["line_wgs_coords"]]},
             "properties": {"route": rid, "corridor": r["corridor"], "mode": r["mode"],
                             "short_name": r.get("short_name", rid),
                             "display_label": r.get("display_label", r.get("short_name", rid))},
         })
-    json.dump({"type": "FeatureCollection", "features": features}, open(path, "w"), indent=1)
+    # No indent: this is the geometry file the browser fetches and parses on
+    # every page load (unlike routes_with_stops_debug.geojson below, which is
+    # for human inspection) — one-coordinate-pair-per-line pretty-printing
+    # was multiplying its size for no benefit to the app.
+    json.dump({"type": "FeatureCollection", "features": features}, open(path, "w"))
 
 
 def export_debug_geojson(stops, path):
