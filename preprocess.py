@@ -9,6 +9,12 @@ supplied GTFS files (routes.txt, shapes.txt, stops.txt) - nothing is
 resampled or redrawn for rail/tram; the *only* stops they get are their
 real GTFS stations (location_type=1 for trains) / stops, projected onto
 the real GTFS shape for that line.
+
+Trains run at a uniform speed and frequency (10 min headway). Trams run
+at a uniform speed but a real per-route frequency, looked up from the same
+FrequencyFinder summary.json used for the existing bus network; tram
+routes the json has no usable frequency for are excluded entirely
+(no fallback/default headway), same as for existing buses.
 """
 
 from shapely.geometry import LineString, MultiLineString, Point
@@ -34,8 +40,10 @@ GTFS_TRAM_STOPS = f"gtfs/3/google_transit/stops.txt"
 GTFS_BUS_ROUTES = f"gtfs/4/google_transit/routes.txt"   # PTV metro bus feed - the *existing*
 GTFS_BUS_SHAPES = f"gtfs/4/google_transit/shapes.txt"   # real-world network, as opposed to the
 GTFS_BUS_STOPS = f"gtfs/4/google_transit/stops.txt"     # hand-drawn reform network in BUS_GEOJSON
-BUS_FREQUENCY_JSON = f"data/bus_frequency_summary.json" # download from:
+FREQUENCY_JSON = f"data/bus_frequency_summary.json"      # download from:
                                                           # https://raw.githubusercontent.com/adambain014/FrequencyFinder/main/route_jsons/summary.json
+                                                          # covers both existing buses and trams -
+                                                          # used as the frequency source for both
 SRL_GEOJSON = f"data/srl.geojson"
 
 OUTPUT_GRAPH = f"data/graph.json"
@@ -62,7 +70,6 @@ B1_FREQUENCY = 5
 B2_FREQUENCY = 10
 SRL_FREQUENCY = 5
 TRAM_SPEED_KMH = 20.0          # universal tram speed (avg incl. stops/dwell)
-TRAM_FREQUENCY = 10            # universal tram frequency, same treatment as trains
 TRAM_COLOR = "#91DE56"
 EXIST_BUS_COLOR = "#ff8200"    # existing (non-reform) metro bus network - must match
                                 # RIDE_COLOR_EXIST_BUS in app.js
@@ -136,11 +143,12 @@ def _parse_frequency_value(v):
     return None
 
 
-def load_bus_frequencies(json_path):
-    """Loads the FrequencyFinder summary.json and returns {route_number: daytime
-    Monday headway in minutes}. Routes with no usable Monday daytime figure
-    (missing, null, or the 'No Next Service' sentinel) are simply omitted -
-    callers should fall back to a default."""
+def load_frequencies(json_path):
+    """Loads the FrequencyFinder summary.json (covers both existing buses and
+    trams) and returns {route_number: daytime Monday headway in minutes}.
+    Routes with no usable Monday daytime figure (missing, null, or the
+    'No Next Service' sentinel) are simply omitted - callers should fall
+    back to a default, or (for buses/trams here) exclude the route entirely."""
     data = json.load(open(json_path, encoding="utf-8"))
     freqs = {}
     for info in data.values():
@@ -171,7 +179,7 @@ def load_gtfs_train_routes(routes_txt, shapes_txt, stops_txt, mode="rail",
     route_key_field="route_short_name") the existing metro bus network.
 
     frequency_min can be a single number (applied to every route) or a dict of
-    {route_number: minutes} - e.g. from load_bus_frequencies() - in which case
+    {route_number: minutes} - e.g. from load_frequencies() - in which case
     any route the dict doesn't cover is simply excluded from the output
     entirely (no fallback/default frequency is applied to it).
 
@@ -726,10 +734,13 @@ def main():
     train_routes.update(srl_routes)
     real_stops_by_route.update(srl_real_stops)
 
+    freq_by_route_number = load_frequencies(FREQUENCY_JSON)
+    print(f"Loaded frequency data for {len(freq_by_route_number)} routes (buses + trams)")
+
     tram_routes, tram_real_stops = load_gtfs_train_routes(
         GTFS_TRAM_ROUTES, GTFS_TRAM_SHAPES, GTFS_TRAM_STOPS,
         mode="tram", corridor="TRAM", id_prefix="TRAM",
-        speed_kmh=TRAM_SPEED_KMH, frequency_min=TRAM_FREQUENCY,
+        speed_kmh=TRAM_SPEED_KMH, frequency_min=freq_by_route_number,
         color=TRAM_COLOR, stop_location_types=("", "0"),
     )
     print(f"Loaded {len(tram_routes)} tram routes from GTFS")
@@ -738,13 +749,11 @@ def main():
     train_routes.update(tram_routes)
     real_stops_by_route.update(tram_real_stops)
 
-    bus_freq_by_route_number = load_bus_frequencies(BUS_FREQUENCY_JSON)
-    print(f"Loaded frequency data for {len(bus_freq_by_route_number)} existing bus routes")
     existing_bus_routes, existing_bus_real_stops = load_gtfs_train_routes(
         GTFS_BUS_ROUTES, GTFS_BUS_SHAPES, GTFS_BUS_STOPS,
         mode="bus", corridor="EXIST_BUS", id_prefix="EBUS",
         speed_kmh=BUS_SPEED_KMH,
-        frequency_min=bus_freq_by_route_number,
+        frequency_min=freq_by_route_number,
         color=EXIST_BUS_COLOR,
         stop_location_types=("", "0"),
         route_key_field="route_short_name",
@@ -788,7 +797,6 @@ def main():
             "train_frequency": TRAIN_FREQUENCY,
             "B1_frequency": B1_FREQUENCY,
             "B2_frequency": B2_FREQUENCY,
-            "tram_frequency": TRAM_FREQUENCY
         },
         "routes": {rid: {"frequency_min": r["frequency_min"], "corridor": r["corridor"], "mode": r["mode"],
                           **({"color": r["color"]} if "color" in r else {}),

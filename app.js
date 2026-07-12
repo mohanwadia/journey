@@ -3,7 +3,7 @@
  * client-side Dijkstra between two user-clicked points. No backend.
  */
 
-const WALK_SPEED_M_PER_MIN = 80;      // must match preprocess.py's constant
+const WALK_SPEED_M_PER_MIN = 50;      // must match preprocess.py's constant
 const MAX_WALK_TO_STOP_M = 5000;       // how far we'll look for a boarding/alighting stop
 const NEAREST_STOP_CANDIDATES = 4;    // don't just take the closest stop — give the router options
 
@@ -750,6 +750,7 @@ function renderIsochrone(latlng, locations) {
 function onIsochroneClick(e) {
   if (!graph) return;
   document.getElementById('iso-instructions').classList.add('hidden');
+  document.getElementById('iso-place-search').value = coordLabel(e.latlng);
   beginIsoCompute(e.latlng, () => syncURL(false));
 }
 
@@ -1666,6 +1667,117 @@ function shareOrCopyLink() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Place search (origin/destination boxes on Journey, single box on
+// Isochrone) — free-text geocoding via OpenStreetMap's Nominatim, biased
+// (not restricted) to the greater Melbourne area so typing "Flinders
+// Street" surfaces the right result first without excluding anywhere else
+// the person might type.
+// ---------------------------------------------------------------------------
+
+const MELBOURNE_VIEWBOX = '144.4,-37.5,145.6,-38.3'; // left,top,right,bottom
+
+function debounce(fn, delayMs) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delayMs);
+  };
+}
+
+async function geocodePlace(query) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}` +
+    `&viewbox=${MELBOURNE_VIEWBOX}&bounded=0&limit=6`;
+  const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+  if (!res.ok) throw new Error('geocode request failed');
+  return res.json();
+}
+
+// Wires up a text input + its dropdown container to search-as-you-type,
+// calling onSelect(latlng, label) once the person picks a suggestion.
+function setupPlaceSearch(inputId, suggId, onSelect) {
+  const input = document.getElementById(inputId);
+  const dropdown = document.getElementById(suggId);
+  let requestToken = 0;
+
+  function hideDropdown() {
+    dropdown.classList.add('hidden');
+    dropdown.innerHTML = '';
+  }
+
+  function renderResults(results) {
+    dropdown.innerHTML = '';
+    if (results.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'suggestion-empty';
+      empty.textContent = 'No matches found';
+      dropdown.appendChild(empty);
+      dropdown.classList.remove('hidden');
+      return;
+    }
+    for (const r of results) {
+      const item = document.createElement('div');
+      item.className = 'suggestion-item';
+      item.textContent = r.display_name;
+      // mousedown (not click) fires before the input's blur handler, so the
+      // dropdown doesn't get hidden out from under the click.
+      item.addEventListener('mousedown', (evt) => {
+        evt.preventDefault();
+        input.value = r.display_name;
+        hideDropdown();
+        onSelect(L.latLng(parseFloat(r.lat), parseFloat(r.lon)), r.display_name);
+      });
+      dropdown.appendChild(item);
+    }
+    dropdown.classList.remove('hidden');
+  }
+
+  const runSearch = debounce(async (query) => {
+    if (query.trim().length < 3) { hideDropdown(); return; }
+    const token = ++requestToken;
+    try {
+      const results = await geocodePlace(query);
+      if (token !== requestToken) return; // a newer keystroke superseded this request
+      renderResults(results);
+    } catch (err) {
+      if (token !== requestToken) return;
+      hideDropdown();
+    }
+  }, 350);
+
+  input.addEventListener('input', () => runSearch(input.value));
+  input.addEventListener('focus', () => { if (input.value.trim().length >= 3) runSearch(input.value); });
+  input.addEventListener('blur', () => { setTimeout(hideDropdown, 100); });
+}
+
+function initPlaceSearch() {
+  setupPlaceSearch('origin-search', 'origin-suggestions', (latlng) => {
+    if (!graph) return;
+    placeJourneyOrigin(latlng);
+    map.setView(latlng, Math.max(map.getZoom(), 14));
+    document.getElementById('instructions').classList.remove('hidden');
+  });
+
+  setupPlaceSearch('dest-search', 'dest-suggestions', (latlng) => {
+    if (!graph) return;
+    placeJourneyDestination(latlng);
+    if (originLatLng) {
+      map.fitBounds(L.latLngBounds([originLatLng, latlng]), { padding: [80, 80] });
+    } else {
+      map.setView(latlng, Math.max(map.getZoom(), 14));
+    }
+  });
+
+  setupPlaceSearch('iso-place-search', 'iso-suggestions', (latlng) => {
+    if (!graph) return;
+    document.getElementById('iso-instructions').classList.add('hidden');
+    beginIsoCompute(latlng, () => syncURL(false));
+    map.setView(latlng, Math.max(map.getZoom(), 14));
+  });
+}
+
+initPlaceSearch();
+
 function onMapClick(e) {
   if (!graph) return;
   if (isPreviewMode) return; // preview embeds are look-but-don't-touch: pan/zoom still work via Leaflet's own handlers, only click-to-place is disabled
@@ -1680,20 +1792,73 @@ function onJourneyClick(e) {
   if (!graph) return;
 
   if (!originLatLng) {
-    originLatLng = e.latlng;
-    if (originMarker) map.removeLayer(originMarker);
-    originMarker = L.circleMarker(e.latlng, { radius: 7, color: '#1a1d1f', weight: 2, fillColor: '#1a1d1f', fillOpacity: 1 }).addTo(map);
-    document.getElementById('instruction-text').innerHTML = 'Now click to set your <strong>destination</strong>.';
+    placeJourneyOrigin(e.latlng, { viaClick: true });
     return;
   }
 
   // Origin is already set (whether this is the 2nd click or a later one) —
   // every subsequent click just moves the destination and re-routes,
   // instead of getting ignored once both points exist.
-  destLatLng = e.latlng;
-  if (destMarker) map.removeLayer(destMarker);
-  destMarker = L.marker(e.latlng, { icon: destPinIcon() }).addTo(map);
+  placeJourneyDestination(e.latlng, { viaClick: true });
+}
 
+// Formats a latlng as plain coordinates for the search boxes, used to give
+// the person feedback on where they clicked without pretending it's a
+// place name.
+function coordLabel(latlng) {
+  return `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+}
+
+// Sets/moves the origin pin — shared by map clicks and the origin search
+// box. Doesn't attempt to route on its own; if a destination is already
+// set (e.g. the person changes their mind on origin after both are
+// placed), it re-routes too. When placed via a map click (rather than a
+// search selection), the coordinates are echoed into the search box and
+// the "now click destination" guidance is skipped — the pin itself is
+// the feedback.
+function placeJourneyOrigin(latlng, { viaClick = false } = {}) {
+  if (!graph) return;
+  originLatLng = latlng;
+  if (originMarker) map.removeLayer(originMarker);
+  originMarker = L.circleMarker(latlng, { radius: 7, color: '#1a1d1f', weight: 2, fillColor: '#1a1d1f', fillOpacity: 1 }).addTo(map);
+
+  if (viaClick) document.getElementById('origin-search').value = coordLabel(latlng);
+
+  if (destLatLng) {
+    runJourneyCompute();
+  } else if (viaClick) {
+    document.getElementById('instructions').classList.add('hidden');
+  } else {
+    document.getElementById('instruction-text').innerHTML = 'Now click to set your <strong>destination</strong>, or search above.';
+  }
+}
+
+// Sets/moves the destination pin and (re-)computes the route — shared by
+// map clicks and the destination search box. See placeJourneyOrigin for
+// the viaClick behavior.
+function placeJourneyDestination(latlng, { viaClick = false } = {}) {
+  if (!graph) return;
+  destLatLng = latlng;
+  if (destMarker) map.removeLayer(destMarker);
+  destMarker = L.marker(latlng, { icon: destPinIcon() }).addTo(map);
+
+  if (viaClick) document.getElementById('dest-search').value = coordLabel(latlng);
+
+  if (!originLatLng) {
+    if (!viaClick) {
+      document.getElementById('instruction-text').innerHTML = 'Now click to set your <strong>origin</strong>, or search above.';
+    } else {
+      document.getElementById('instructions').classList.add('hidden');
+    }
+    return;
+  }
+  runJourneyCompute();
+}
+
+// Computes all four network combos for the current origin/dest pair and
+// updates the panel — the shared tail end of both placeJourneyOrigin (when
+// dest is already set) and placeJourneyDestination.
+function runJourneyCompute() {
   computeAllJourneyCombos(originLatLng, destLatLng);
   const anyResult = JOURNEY_COMBOS.some((c) => journeyResults[c.key]);
   if (!anyResult) {
@@ -1750,7 +1915,9 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   document.getElementById('empty-state').classList.remove('hidden');
   document.getElementById('empty-state').innerHTML = '';
   document.getElementById('instructions').classList.remove('hidden');
-  document.getElementById('instruction-text').innerHTML = 'Click the map to set your <strong>origin</strong>.';
+  document.getElementById('instruction-text').innerHTML = 'Click the map to set your <strong>origin</strong>, or search above.';
+  document.getElementById('origin-search').value = '';
+  document.getElementById('dest-search').value = '';
 
   applyNetworkState(true, true); // back to the "Both" (SRL + Bus Reform) network for the next trip
 
@@ -1767,7 +1934,8 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   document.getElementById('iso-combo-selector').classList.add('hidden');
   document.getElementById('iso-instructions').classList.remove('hidden');
   document.getElementById('iso-instruction-text').innerHTML =
-    'Click the map to see how far you can travel in <strong>20</strong>, <strong>40</strong>, and <strong>60</strong> minutes.';
+    'Click the map to see how far you can travel in <strong>20</strong>, <strong>40</strong>, and <strong>60</strong> minutes, or search above.';
+  document.getElementById('iso-place-search').value = '';
 
   syncURL(false);
 });

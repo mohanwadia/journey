@@ -28,8 +28,19 @@
       </div>
 
       <div id="journey-panel" class="tab-panel">
+        <div id="journey-search" class="panel-block search-block">
+          <div class="search-field">
+            <input type="text" id="origin-search" class="search-input" placeholder="Search origin…" autocomplete="off" />
+            <div id="origin-suggestions" class="suggestions-dropdown hidden"></div>
+          </div>
+          <div class="search-field">
+            <input type="text" id="dest-search" class="search-input" placeholder="Search destination…" autocomplete="off" />
+            <div id="dest-suggestions" class="suggestions-dropdown hidden"></div>
+          </div>
+        </div>
+
         <div id="instructions" class="instruction-banner">
-          <p id="instruction-text">Click the map to set your <strong>origin</strong>.</p>
+          <p id="instruction-text">Click the map to set your <strong>origin</strong>, or search above.</p>
         </div>
 
         <div id="combo-selector" class="panel-block hidden">
@@ -52,8 +63,15 @@
       </div>
 
       <div id="isochrone-panel" class="tab-panel hidden">
+        <div id="iso-search" class="panel-block search-block">
+          <div class="search-field">
+            <input type="text" id="iso-place-search" class="search-input" placeholder="Search a place…" autocomplete="off" />
+            <div id="iso-suggestions" class="suggestions-dropdown hidden"></div>
+          </div>
+        </div>
+
         <div id="iso-instructions" class="instruction-banner">
-          <p id="iso-instruction-text">Click the map to see how far you can travel in <strong>20</strong>, <strong>40</strong>, and <strong>60</strong> minutes.</p>
+          <p id="iso-instruction-text">Click the map to see how far you can travel in <strong>20</strong>, <strong>40</strong>, and <strong>60</strong> minutes, or search above.</p>
         </div>
 
         <div id="iso-combo-selector" class="panel-block hidden">

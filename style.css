@@ -106,10 +106,11 @@ html, body {
   width: 340px;
   flex-shrink: 0;
   background: var(--panel);
-  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  order: -1; /* sidebar sits left of the map on desktop; see mobile override below */
 }
 
 #panel-header {
@@ -210,6 +211,65 @@ html, body {
 .swatch-20 { background-color: rgba(29, 78, 216, 0.55); }
 .swatch-40 { background-color: rgba(29, 78, 216, 0.32); }
 .swatch-60 { background-color: rgba(29, 78, 216, 0.16); }
+
+.search-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-field {
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  padding: 9px 12px;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  outline: none;
+}
+.search-input::placeholder { color: var(--muted); }
+.search-input:focus { border-color: var(--accent); }
+
+.suggestions-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.suggestion-item {
+  padding: 9px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink);
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+}
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:hover,
+.suggestion-item.highlighted {
+  background: var(--paper);
+}
+
+.suggestion-empty {
+  padding: 9px 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-style: italic;
+}
 
 .instruction-banner {
   padding: 14px 20px;
@@ -438,10 +498,11 @@ html, body {
 
   #panel {
     width: 100%;
-    border-left: none;
+    border-right: none;
     border-top: 1px solid var(--line);
     flex: 0 0 auto;
-    max-height: 25vh;
+    max-height: 42.5vh; /* 70% more than the original 25vh */
+    order: 1; /* undo the desktop left-sidebar order — map stays on top on mobile */
   }
 
   /* Isochrone tab: lay the legend out horizontally instead of stacked, so
@@ -493,9 +554,10 @@ body.preview-mode #panel {
   flex: 0 0 auto !important;
   min-height: 15vh;
   max-height: none !important;
-  border-left: none;
+  border-right: none;
   border-top: 1px solid var(--line);
   overflow: visible;
+  order: 1 !important; /* map stays on top in preview embeds too */
 }
 
 /* Hide the tab switcher and the journey-detail blocks; the title/Reset/
@@ -504,7 +566,8 @@ body.preview-mode #tabs,
 body.preview-mode .instruction-banner,
 body.preview-mode #summary,
 body.preview-mode #itinerary,
-body.preview-mode #empty-state {
+body.preview-mode #empty-state,
+body.preview-mode .search-block {
   display: none !important;
 }
 
