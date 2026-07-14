@@ -17,7 +17,7 @@ const RIDE_COLOR_RAIL = '#0072CE';
 const RIDE_COLOR_DEFAULT = '#ff8200';
 const RIDE_COLOR_SRL = '#008746';
 const RIDE_COLOR_TRAM = '#91DE56';
-const RIDE_COLOR_EXIST_BUS = '#ff8200'; // must match EXIST_BUS_COLOR in preprocess.py
+const RIDE_COLOR_EXIST_BUS = '#C1855D'; // must match EXIST_BUS_COLOR in preprocess.py
 
 // Muted/duller version of a bright hex color, used for the background route
 // lines shown before the person has clicked anything - blends toward a
@@ -434,9 +434,9 @@ class MinHeap {
 // chosen, everything shown to the user (leg times, itinerary, total-time
 // badge) is based on real, unpenalized durations — see the totalMin
 // recomputation below.
-const WALK_PENALTY_MULTIPLIER = 2.2;
-const INITIAL_WAIT_PENALTY_MULTIPLIER = 2.1;   // 'board' edges — waiting for the first vehicle
-const CONNECTION_WAIT_PENALTY_MULTIPLIER = 2.5; // 'transfer' edges — waiting for a connecting vehicle
+const WALK_PENALTY_MULTIPLIER = 1;
+const INITIAL_WAIT_PENALTY_MULTIPLIER = 1;   // 'board' edges — waiting for the first vehicle
+const CONNECTION_WAIT_PENALTY_MULTIPLIER = 1; // 'transfer' edges — waiting for a connecting vehicle
 
 function edgeRoutingCost(e) {
   if (e.type === 'walk') return e.weight_min * WALK_PENALTY_MULTIPLIER;
